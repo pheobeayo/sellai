@@ -18,6 +18,8 @@ export interface Store {
   addOrder(o: Order): void;
   orders(): Order[];
   order(ref: string): Order | undefined;
+  /** Records a checkout-link click. Returns the updated order, or undefined if the ref is unknown. */
+  recordClick(ref: string): Order | undefined;
 }
 
 class MemoryStore implements Store {
@@ -35,6 +37,13 @@ class MemoryStore implements Store {
   addOrder(o: Order) { this._orders.push(o); }
   orders() { return [...this._orders]; }
   order(ref: string) { return this._orders.find((o) => o.ref === ref); }
+  recordClick(ref: string) {
+    const o = this.order(ref);
+    if (!o) return undefined;
+    o.linkClicks += 1;
+    o.firstClickedAt ??= new Date().toISOString();
+    return o;
+  }
 }
 
 // Survive Next.js hot reloads in development.

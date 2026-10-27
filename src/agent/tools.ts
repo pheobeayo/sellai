@@ -1,7 +1,7 @@
 import type OpenAI from "openai";
 import { z } from "zod";
 import type { Channel, Order } from "@/domain/types";
-import { newOrderRef, whatsappCheckoutLink } from "@/integrations/attribution";
+import { checkoutShortLink, newOrderRef } from "@/integrations/attribution";
 import { store } from "@/store/store";
 
 /**
@@ -41,7 +41,7 @@ export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "search_catalogue",
-      description: "Find products in the vendor's catalogue by keywords (style, length, colour). Returns ids, names and price ranges.",
+      description: "Find products in the catalogue by keywords (style, length, colour). Returns each match with all variants: variant_id, label, exact price and stock.",
       parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
     },
   },
@@ -116,11 +116,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         .filter((x) => x.score > 0)
         .sort((x, y) => y.score - x.score)
         .slice(0, 5);
-      const matches = (scored.length ? scored.map((x) => x.p) : store.products()).map((p) => {
-        const prices = p.variants.map((v) => v.priceNaira);
-        return { product_id: p.id, name: p.name, from: naira(Math.min(...prices)), to: naira(Math.max(...prices)) };
-      });
-      const amounts = matches.flatMap((m) => store.product(m.product_id)!.variants.map((v) => v.priceNaira));
+      // Return variants with price and stock so the agent can usually answer without a second call.
+      const products = scored.length ? scored.map((x) => x.p) : store.products();
+      const matches = products.map((p) => ({
+        product_id: p.id,
+        name: p.name,
+        variants: p.variants.map((v) => ({ variant_id: v.id, label: v.label, price: naira(v.priceNaira), in_stock: v.stock > 0, stock_left: v.stock })),
+      }));
+      const amounts = products.flatMap((p) => p.variants.map((v) => v.priceNaira));
       return { ok: true, data: { matches, note: scored.length ? undefined : "No close match; showing full catalogue." }, groundedAmounts: amounts };
     }
 
@@ -178,9 +181,11 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         sourcePostId: ctx.postId,
         status: "draft_awaiting_vendor",
         createdAt: new Date().toISOString(),
+        linkClicks: 0,
       };
       store.addOrder(order);
-      const link = whatsappCheckoutLink({ vendorNumber: store.vendor().whatsappNumber, orderRef: order.ref, productName: `${p.name} ${v.label}`, postId: ctx.postId });
+      // Short tracked link: /o/<ref> records the click, then redirects to WhatsApp with the ref prefilled.
+      const link = checkoutShortLink(order.ref);
       return {
         ok: true,
         data: {
@@ -199,7 +204,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
     case "escalate_to_vendor": {
       const a = EscalateArgs.safeParse(json);
       if (!a.success) return { ok: false, error: a.error.message };
-      return { ok: true, data: { escalated: true, reason: a.data.reason, note: "Tell the customer the vendor will reply personally soon." } };
+      return { ok: true, data: { escalated: true, reason: a.data.reason, note: "Tell the customer we will reply personally soon." } };
     }
 
     default:

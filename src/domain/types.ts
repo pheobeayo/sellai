@@ -65,4 +65,7 @@ export interface Order {
   sourcePostId?: string;
   status: OrderStatus;
   createdAt: string;
+  /** Times the buyer opened the checkout link. Funnel: enquiry → link clicked → order confirmed. */
+  linkClicks: number;
+  firstClickedAt?: string;
 }

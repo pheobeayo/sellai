@@ -18,6 +18,9 @@ ${INTENTS.map((i) => `- ${i}: ${INTENT_GUIDE[i]}`).join("\n")}
 Rules:
 - If a message mixes intents, pick the one closest to a purchase (ready_to_buy > price/delivery/availability > product_question).
 - complaint always wins over other intents.
+- Fixed specs of the product (lace size, hair type/origin, material, care) are product_question.
+  Options the customer chooses between or that can run out (length, colour, size, stock, restock) are availability_or_variant.
+- Short expressions of wanting the item ("I need this!", "Interested", "I want it") count as ready_to_buy: a missed buyer costs more than a false alarm.
 - language is one of: ${LANGUAGES.join(", ")}. Use "mixed" for code-switching between two or more.
 - Never invent details that are not in the message; use null for product_hint or city when absent.
 

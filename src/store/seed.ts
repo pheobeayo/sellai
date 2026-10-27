@@ -6,7 +6,7 @@ export const seedVendor: Vendor = {
   businessName: "Demo Hair Hub",
   whatsappNumber: process.env.VENDOR_WHATSAPP_NUMBER ?? "2348000000000",
   paymentNote:
-    "Payment is by bank transfer. The vendor sends account details personally after confirming the order.",
+    "Payment is by bank transfer. We send account details personally after confirming the order.",
   tone: "Warm, short and friendly. Matches the customer's language: Pidgin if they write Pidgin, English if they write English.",
 };
 

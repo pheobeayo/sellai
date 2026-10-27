@@ -1,60 +1,60 @@
-{"id":"c01","text":"HM?","intent":"price_enquiry","language":"english"}
-{"id":"c02","text":"Price pls","intent":"price_enquiry","language":"english"}
-{"id":"c03","text":"DM price","intent":"price_enquiry","language":"english"}
-{"id":"c04","text":"abeg how much be this one","intent":"price_enquiry","language":"pidgin"}
-{"id":"c05","text":"How much for the 24 inches?","intent":"price_enquiry","language":"english"}
-{"id":"c06","text":"Why una own cost pass the one wey I see for Balogun?","intent":"price_enquiry","language":"pidgin"}
-{"id":"c07","text":"Elo ni?","intent":"price_enquiry","language":"yoruba"}
-{"id":"c08","text":"Nawa ne?","intent":"price_enquiry","language":"hausa"}
-{"id":"c09","text":"Ego ole?","intent":"price_enquiry","language":"igbo"}
-{"id":"c10","text":"Last price for 2?","intent":"price_enquiry","language":"english"}
-{"id":"c11","text":"I wan buy am, send account number","intent":"ready_to_buy","language":"pidgin"}
-{"id":"c12","text":"Pls I need this in 20 inches, how I go take pay?","intent":"ready_to_buy","language":"pidgin"}
-{"id":"c13","text":"How do I order?","intent":"ready_to_buy","language":"english"}
-{"id":"c14","text":"How I fit order this one?","intent":"ready_to_buy","language":"pidgin"}
-{"id":"c15","text":"I want 2 of the body wave 18 inches, deliver to Ikeja","intent":"ready_to_buy","language":"english"}
-{"id":"c16","text":"Sending money now, which account?","intent":"ready_to_buy","language":"english"}
-{"id":"c17","text":"Mo fẹ́ ra ẹyọ méjì","intent":"ready_to_buy","language":"yoruba"}
-{"id":"c18","text":"Elo ni eleyi? Mo fe ra","intent":"ready_to_buy","language":"yoruba"}
-{"id":"c19","text":"Ina son saya, ya zan biya?","intent":"ready_to_buy","language":"hausa"}
-{"id":"c20","text":"Achọrọ m ịzụta ya","intent":"ready_to_buy","language":"igbo"}
-{"id":"c21","text":"Abeg reserve the pixie for me, I go pay tomorrow morning","intent":"ready_to_buy","language":"pidgin"}
-{"id":"c22","text":"Book me one burgundy, I'm in Wuse","intent":"ready_to_buy","language":"english"}
-{"id":"c23","text":"Una dey deliver Ibadan?","intent":"delivery_enquiry","language":"pidgin"}
-{"id":"c24","text":"Do you deliver to Lagos?","intent":"delivery_enquiry","language":"english"}
-{"id":"c25","text":"Delivery to Port Harcourt na how much?","intent":"delivery_enquiry","language":"pidgin"}
-{"id":"c26","text":"Do you ship to Abuja same day?","intent":"delivery_enquiry","language":"english"}
-{"id":"c27","text":"Ṣé ẹ ń ṣe delivery sí Ibadan?","intent":"delivery_enquiry","language":"mixed"}
-{"id":"c28","text":"Kuna kai kaya Kano?","intent":"delivery_enquiry","language":"hausa"}
-{"id":"c29","text":"If I order today when e go reach Enugu?","intent":"delivery_enquiry","language":"pidgin"}
-{"id":"c30","text":"Can I pick up instead of delivery? Where is your shop?","intent":"delivery_enquiry","language":"english"}
-{"id":"c31","text":"E dey for 26 inches?","intent":"availability_or_variant","language":"pidgin"}
-{"id":"c32","text":"Do you have this in burgundy?","intent":"availability_or_variant","language":"english"}
-{"id":"c33","text":"Is the 24 inches still available?","intent":"availability_or_variant","language":"english"}
-{"id":"c34","text":"Ẹ ní òmíràn tó kúrú?","intent":"availability_or_variant","language":"yoruba"}
-{"id":"c35","text":"Una get am for brown colour?","intent":"availability_or_variant","language":"pidgin"}
-{"id":"c36","text":"Restock when? The 26 don finish","intent":"availability_or_variant","language":"pidgin"}
-{"id":"c37","text":"Is it human hair or synthetic?","intent":"product_question","language":"english"}
-{"id":"c38","text":"This one go last pass one year?","intent":"product_question","language":"pidgin"}
-{"id":"c39","text":"Na Brazilian or Vietnamese hair?","intent":"product_question","language":"pidgin"}
-{"id":"c40","text":"Can I dye it blonde?","intent":"product_question","language":"english"}
-{"id":"c41","text":"Is the body wave glueless? I no sabi install lace","intent":"product_question","language":"mixed"}
-{"id":"c42","text":"Does it shed?","intent":"product_question","language":"english"}
-{"id":"c43","text":"Wetin be the lace size?","intent":"product_question","language":"pidgin"}
-{"id":"c44","text":"I paid since Monday, my wig never reach o","intent":"complaint","language":"pidgin"}
-{"id":"c45","text":"The hair wey I buy last week don dey shed, I want refund","intent":"complaint","language":"pidgin"}
-{"id":"c46","text":"You people sent me 20 inches instead of 24. Very disappointed","intent":"complaint","language":"english"}
-{"id":"c47","text":"Rider no pick my call since morning, where my order dey?","intent":"complaint","language":"pidgin"}
-{"id":"c48","text":"Beautiful 😍😍","intent":"casual_engagement","language":"english"}
-{"id":"c49","text":"Omo this one fine o 🔥","intent":"casual_engagement","language":"pidgin"}
-{"id":"c50","text":"Who else dey watch this for 2am 😂","intent":"casual_engagement","language":"pidgin"}
-{"id":"c51","text":"@tolu_b see this one for your birthday","intent":"casual_engagement","language":"english"}
-{"id":"c52","text":"The model is so pretty","intent":"casual_engagement","language":"english"}
-{"id":"c53","text":"Ẹ kú iṣẹ́ o 👏","intent":"casual_engagement","language":"yoruba"}
-{"id":"c54","text":"Make $500 daily from home, DM me for forex signals","intent":"spam_or_irrelevant","language":"english"}
-{"id":"c55","text":"Follow back pls","intent":"spam_or_irrelevant","language":"english"}
-{"id":"c56","text":"Check my page for cheap iPhones 📱","intent":"spam_or_irrelevant","language":"english"}
-{"id":"c57","text":"Who won the match yesterday?","intent":"spam_or_irrelevant","language":"english"}
-{"id":"c58","text":"I need this!","intent":"casual_engagement","language":"english","ambiguous":true}
-{"id":"c59","text":"Wow I go buy this one when salary enter","intent":"casual_engagement","language":"pidgin","ambiguous":true}
-{"id":"c60","text":"Interested","intent":"price_enquiry","language":"english","ambiguous":true}
+{"id": "c01", "text": "HM?", "intent": "price_enquiry", "language": "english"}
+{"id": "c02", "text": "Price pls", "intent": "price_enquiry", "language": "english"}
+{"id": "c03", "text": "DM price", "intent": "price_enquiry", "language": "english"}
+{"id": "c04", "text": "abeg how much be this one", "intent": "price_enquiry", "language": "pidgin"}
+{"id": "c05", "text": "How much for the 24 inches?", "intent": "price_enquiry", "language": "english"}
+{"id": "c06", "text": "Why una own cost pass the one wey I see for Balogun?", "intent": "price_enquiry", "language": "pidgin"}
+{"id": "c07", "text": "Elo ni?", "intent": "price_enquiry", "language": "yoruba"}
+{"id": "c08", "text": "Nawa ne?", "intent": "price_enquiry", "language": "hausa"}
+{"id": "c09", "text": "Ego ole?", "intent": "price_enquiry", "language": "igbo"}
+{"id": "c10", "text": "Last price for 2?", "intent": "price_enquiry", "language": "english"}
+{"id": "c11", "text": "I wan buy am, send account number", "intent": "ready_to_buy", "language": "pidgin"}
+{"id": "c12", "text": "Pls I need this in 20 inches, how I go take pay?", "intent": "ready_to_buy", "language": "pidgin"}
+{"id": "c13", "text": "How do I order?", "intent": "ready_to_buy", "language": "english"}
+{"id": "c14", "text": "How I fit order this one?", "intent": "ready_to_buy", "language": "pidgin"}
+{"id": "c15", "text": "I want 2 of the body wave 18 inches, deliver to Ikeja", "intent": "ready_to_buy", "language": "english"}
+{"id": "c16", "text": "Sending money now, which account?", "intent": "ready_to_buy", "language": "english"}
+{"id": "c17", "text": "Mo fẹ́ ra ẹyọ méjì", "intent": "ready_to_buy", "language": "yoruba"}
+{"id": "c18", "text": "Elo ni eleyi? Mo fe ra", "intent": "ready_to_buy", "language": "yoruba"}
+{"id": "c19", "text": "Ina son saya, ya zan biya?", "intent": "ready_to_buy", "language": "hausa"}
+{"id": "c20", "text": "Achọrọ m ịzụta ya", "intent": "ready_to_buy", "language": "igbo"}
+{"id": "c21", "text": "Abeg reserve the pixie for me, I go pay tomorrow morning", "intent": "ready_to_buy", "language": "pidgin"}
+{"id": "c22", "text": "Book me one burgundy, I'm in Wuse", "intent": "ready_to_buy", "language": "english"}
+{"id": "c23", "text": "Una dey deliver Ibadan?", "intent": "delivery_enquiry", "language": "pidgin"}
+{"id": "c24", "text": "Do you deliver to Lagos?", "intent": "delivery_enquiry", "language": "english"}
+{"id": "c25", "text": "Delivery to Port Harcourt na how much?", "intent": "delivery_enquiry", "language": "pidgin"}
+{"id": "c26", "text": "Do you ship to Abuja same day?", "intent": "delivery_enquiry", "language": "english"}
+{"id": "c27", "text": "Ṣé ẹ ń ṣe delivery sí Ibadan?", "intent": "delivery_enquiry", "language": "mixed"}
+{"id": "c28", "text": "Kuna kai kaya Kano?", "intent": "delivery_enquiry", "language": "hausa"}
+{"id": "c29", "text": "If I order today when e go reach Enugu?", "intent": "delivery_enquiry", "language": "pidgin"}
+{"id": "c30", "text": "Can I pick up instead of delivery? Where is your shop?", "intent": "delivery_enquiry", "language": "english"}
+{"id": "c31", "text": "E dey for 26 inches?", "intent": "availability_or_variant", "language": "pidgin"}
+{"id": "c32", "text": "Do you have this in burgundy?", "intent": "availability_or_variant", "language": "english"}
+{"id": "c33", "text": "Is the 24 inches still available?", "intent": "availability_or_variant", "language": "english"}
+{"id": "c34", "text": "Ẹ ní òmíràn tó kúrú?", "intent": "availability_or_variant", "language": "yoruba"}
+{"id": "c35", "text": "Una get am for brown colour?", "intent": "availability_or_variant", "language": "pidgin"}
+{"id": "c36", "text": "Restock when? The 26 don finish", "intent": "availability_or_variant", "language": "pidgin"}
+{"id": "c37", "text": "Is it human hair or synthetic?", "intent": "product_question", "language": "english"}
+{"id": "c38", "text": "This one go last pass one year?", "intent": "product_question", "language": "pidgin"}
+{"id": "c39", "text": "Na Brazilian or Vietnamese hair?", "intent": "product_question", "language": "pidgin"}
+{"id": "c40", "text": "Can I dye it blonde?", "intent": "product_question", "language": "english"}
+{"id": "c41", "text": "Is the body wave glueless? I no sabi install lace", "intent": "product_question", "language": "mixed"}
+{"id": "c42", "text": "Does it shed?", "intent": "product_question", "language": "english"}
+{"id": "c43", "text": "Wetin be the lace size?", "intent": "product_question", "language": "pidgin"}
+{"id": "c44", "text": "I paid since Monday, my wig never reach o", "intent": "complaint", "language": "pidgin"}
+{"id": "c45", "text": "The hair wey I buy last week don dey shed, I want refund", "intent": "complaint", "language": "pidgin"}
+{"id": "c46", "text": "You people sent me 20 inches instead of 24. Very disappointed", "intent": "complaint", "language": "english"}
+{"id": "c47", "text": "Rider no pick my call since morning, where my order dey?", "intent": "complaint", "language": "pidgin"}
+{"id": "c48", "text": "Beautiful 😍😍", "intent": "casual_engagement", "language": "english"}
+{"id": "c49", "text": "Omo this one fine o 🔥", "intent": "casual_engagement", "language": "pidgin"}
+{"id": "c50", "text": "Who else dey watch this for 2am 😂", "intent": "casual_engagement", "language": "pidgin"}
+{"id": "c51", "text": "@tolu_b see this one for your birthday", "intent": "casual_engagement", "language": "english"}
+{"id": "c52", "text": "The model is so pretty", "intent": "casual_engagement", "language": "english"}
+{"id": "c53", "text": "Ẹ kú iṣẹ́ o 👏", "intent": "casual_engagement", "language": "yoruba"}
+{"id": "c54", "text": "Make $500 daily from home, DM me for forex signals", "intent": "spam_or_irrelevant", "language": "english"}
+{"id": "c55", "text": "Follow back pls", "intent": "spam_or_irrelevant", "language": "english"}
+{"id": "c56", "text": "Check my page for cheap iPhones 📱", "intent": "spam_or_irrelevant", "language": "english"}
+{"id": "c57", "text": "Who won the match yesterday?", "intent": "spam_or_irrelevant", "language": "english"}
+{"id": "c58", "text": "I need this!", "intent": "ready_to_buy", "language": "english", "ambiguous": true}
+{"id": "c59", "text": "Wow I go buy this one when salary enter", "intent": "casual_engagement", "language": "pidgin", "ambiguous": true}
+{"id": "c60", "text": "Interested", "intent": "ready_to_buy", "language": "english", "ambiguous": true}

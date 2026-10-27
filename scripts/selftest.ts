@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { checkGrounding, extractNairaAmounts } from "@/agent/grounding";
 import { runTool } from "@/agent/tools";
 import { normalizeWebhook } from "@/integrations/meta-webhook";
-import { parseAttribution } from "@/integrations/attribution";
+import { parseAttribution, whatsappCheckoutLink } from "@/integrations/attribution";
+import { store } from "@/store/store";
 
 // Offline checks: no API key needed. Run with `npm run selftest`.
 
@@ -26,7 +27,20 @@ const ord = await runTool("create_order_draft", JSON.stringify({ product_id: "p_
 assert.ok(ord.ok);
 const od = ord.data as { order_ref: string; total: string; checkout_link: string };
 assert.match(od.total, /103,000/);
-const back = parseAttribution(decodeURIComponent(od.checkout_link.split("text=")[1]));
+assert.equal(od.checkout_link, `http://localhost:3000/o/${od.order_ref}`, "agent gets a short tracked link");
+
+// search_catalogue now returns variants with ids, prices and stock
+const s = await runTool("search_catalogue", JSON.stringify({ query: "body wave" }), ctx);
+const sm = (s.data as { matches: Array<{ product_id: string; variants: Array<{ variant_id: string; in_stock: boolean }> }> }).matches;
+assert.equal(sm[0].product_id, "p_body_wave");
+assert.ok(sm[0].variants.some((v) => v.variant_id === "v_bw_18" && v.in_stock));
+
+// Click tracking + the WhatsApp link the short link redirects to
+assert.equal(store.recordClick(od.order_ref)?.linkClicks, 1);
+assert.equal(store.recordClick(od.order_ref)?.linkClicks, 2);
+assert.equal(store.recordClick("SA-NOPE"), undefined);
+const wa = whatsappCheckoutLink({ vendorNumber: "2348000000000", orderRef: od.order_ref, productName: "Bone Straight 24 inches", postId: "post_ig_bs01" });
+const back = parseAttribution(decodeURIComponent(wa.split("text=")[1]));
 assert.equal(back.orderRef, od.order_ref);
 assert.equal(back.postId, "post_ig_bs01");
 
