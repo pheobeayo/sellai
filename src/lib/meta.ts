@@ -6,8 +6,14 @@ import type { z } from "zod";
  * with a different base URL and key.
  */
 export const MODELS = {
-  agent: process.env.MODEL_AGENT || "muse-spark-1.1",
-  triage: process.env.MODEL_TRIAGE || "muse-spark-1.1",
+  agent: process.env.MODEL_AGENT || "muse-spark-1.3",
+  triage: process.env.MODEL_TRIAGE || "muse-spark-1.3",
+};
+
+/** Shared network settings: retry dropped connections, fail hung requests instead of waiting forever. */
+const NETWORK = {
+  maxRetries: 4, // retries connection errors, timeouts, 429s and 5xx with exponential backoff
+  timeout: 60_000, // 60s per request
 };
 
 let metaClient: OpenAI | null = null;
@@ -17,7 +23,11 @@ export function meta(): OpenAI {
   if (!metaClient) {
     const apiKey = process.env.MODEL_API_KEY;
     if (!apiKey) throw new Error("MODEL_API_KEY is not set. Copy .env.example to .env and add your key.");
-    metaClient = new OpenAI({ apiKey, baseURL: process.env.META_BASE_URL || "https://api.meta.ai/v1" });
+    metaClient = new OpenAI({
+      apiKey,
+      baseURL: process.env.META_BASE_URL || "https://api.meta.ai/v1",
+      ...NETWORK,
+    });
   }
   return metaClient;
 }
@@ -33,7 +43,7 @@ export function triageClient(): { client: OpenAI; model: string; provider: strin
   triageClientCache =
     baseURL && apiKey
       ? {
-          client: new OpenAI({ baseURL, apiKey }),
+          client: new OpenAI({ baseURL, apiKey, ...NETWORK }),
           model: process.env.TRIAGE_MODEL || "meta-models/muse-spark-open-1026",
           provider: "open-weights",
         }
