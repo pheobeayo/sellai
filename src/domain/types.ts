@@ -1,0 +1,68 @@
+export type Channel = "instagram_comment" | "facebook_comment" | "whatsapp" | "manual_import";
+
+export interface Variant {
+  id: string;
+  label: string; // e.g. "22 inches" or "Burgundy"
+  priceNaira: number;
+  stock: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  variants: Variant[];
+}
+
+export interface DeliveryZone {
+  city: string;
+  aliases: string[];
+  feeNaira: number;
+  eta: string;
+}
+
+export interface Post {
+  id: string;
+  channel: Channel;
+  caption: string;
+  productIds: string[];
+  postedAt: string;
+}
+
+export interface Vendor {
+  id: string;
+  businessName: string;
+  whatsappNumber: string;
+  paymentNote: string; // how the vendor wants to be paid; the agent never invents account details
+  tone: string;
+}
+
+export interface Enquiry {
+  id: string;
+  channel: Channel;
+  text: string;
+  authorHandle?: string;
+  postId?: string;
+  receivedAt: string;
+  transcribedFromVoice?: boolean;
+}
+
+export type OrderStatus = "draft_awaiting_vendor" | "confirmed" | "paid" | "cancelled";
+
+export interface Order {
+  ref: string; // short reference code shared with the buyer, e.g. SA-7K2P
+  productId: string;
+  variantId: string;
+  quantity: number;
+  unitPriceNaira: number;
+  deliveryFeeNaira: number;
+  totalNaira: number;
+  city?: string;
+  customerHandle?: string;
+  channel: Channel;
+  sourcePostId?: string;
+  status: OrderStatus;
+  createdAt: string;
+}

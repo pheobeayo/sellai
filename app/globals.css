@@ -1,0 +1,36 @@
+:root {
+  --bg: #faf8f5;
+  --panel: #ffffff;
+  --ink: #1d1b19;
+  --muted: #6f6a64;
+  --line: #e7e2db;
+  --accent: #0f7b5f;
+  --hot: #c2410c;
+  --warn: #b45309;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+textarea { width: 100%; min-height: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; resize: vertical; }
+button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.item { border-top: 1px solid var(--line); padding: 10px 0; cursor: pointer; }
+.item:first-child { border-top: 0; }
+.item.active { background: #f2efe9; margin: 0 -16px; padding: 10px 16px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #eee; margin-right: 6px; }
+.tag.ready_to_buy { background: #fde3d3; color: var(--hot); }
+.tag.complaint { background: #fde9c8; color: var(--warn); }
+.tag.price_enquiry, .tag.delivery_enquiry, .tag.availability_or_variant { background: #dcefe8; color: var(--accent); }
+.gloss { color: var(--muted); font-size: 13px; }
+.draft { white-space: pre-wrap; background: #f6fbf9; border: 1px solid #cfe7dd; border-radius: 8px; padding: 12px; }
+.trace { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); margin-top: 10px; }
+.flag { color: var(--hot); font-weight: 600; }
+.ok { color: var(--accent); font-weight: 600; }
+.err { color: var(--hot); }
