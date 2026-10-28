@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { normalizeWebhook, verifySignature } from "@/integrations/meta-webhook";
-import { downloadWhatsAppMedia, transcribeVoiceNote } from "@/integrations/whatsapp";
+import { transcribe } from "@/ai/transcribe";
+import { downloadWhatsAppMedia } from "@/integrations/whatsapp";
 import { store } from "@/store/store";
 
 export const runtime = "nodejs";
@@ -31,8 +32,8 @@ export async function POST(req: Request) {
   // In production move this to a queue; Meta expects a fast 200.
   for (const v of voiceNotes) {
     try {
-      const { bytes, mimeType } = await downloadWhatsAppMedia(v.mediaId);
-      const text = await transcribeVoiceNote(bytes, mimeType);
+      const { bytes } = await downloadWhatsAppMedia(v.mediaId);
+      const { text } = await transcribe(bytes);
       store.addEnquiry({ id: `wa_voice_${v.mediaId}`, channel: "whatsapp", text, authorHandle: v.from, receivedAt: v.receivedAt, transcribedFromVoice: true });
     } catch (e) {
       console.error("voice note failed", v.mediaId, (e as Error).message);

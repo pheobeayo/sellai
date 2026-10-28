@@ -34,3 +34,16 @@ button.ghost { background: transparent; color: var(--accent); border: 1px solid 
 .flag { color: var(--hot); font-weight: 600; }
 .ok { color: var(--accent); font-weight: 600; }
 .err { color: var(--hot); }
+.nav { display: flex; gap: 16px; margin-bottom: 12px; font-size: 14px; }
+.nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.nav span { color: var(--muted); font-weight: 600; }
+input.text { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; flex: 1; min-width: 0; width: 100%; }
+.field { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.field input, .field textarea { margin-top: 4px; color: var(--ink); }
+.thumb { max-width: 220px; border-radius: 8px; margin-top: 12px; display: block; }
+.images { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 10px; }
+.imgopt { border: 2px solid var(--line); border-radius: 10px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.imgopt.active { border-color: var(--accent); color: var(--ink); }
+.imgopt input { display: none; }
+.imgopt img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 6px; background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 16px 16px; }
+.voice { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }

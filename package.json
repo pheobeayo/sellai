@@ -12,13 +12,18 @@
     "eval": "tsx scripts/eval.ts",
     "agent:demo": "tsx scripts/agent-demo.ts",
     "ping": "tsx scripts/ping.ts",
-    "selftest": "tsx scripts/selftest.ts"
+    "selftest": "tsx scripts/selftest.ts",
+    "voice:demo": "tsx scripts/transcribe-demo.ts",
+    "catalogue:demo": "tsx scripts/catalogue-demo.ts"
   },
   "dependencies": {
+    "@meta-sam/parser": "^0.1.0",
+    "ffmpeg-static": "^5.3.0",
     "next": "^16.4.3",
     "openai": "^4.77.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "sharp": "^0.35.5",
     "zod": "^3.24.0"
   },
   "devDependencies": {

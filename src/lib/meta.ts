@@ -79,7 +79,8 @@ export async function completeJSON<T>(opts: {
   client: OpenAI;
   model: string;
   system: string;
-  user: string;
+  /** Plain text, or content parts (text + images) for vision calls. */
+  user: string | OpenAI.ChatCompletionContentPart[];
   schema: z.ZodType<T>;
   maxRetries?: number;
   temperature?: number;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { TriagedMessage } from "@/agent/classify";
 import type { AgentRun } from "@/agent/sales-agent";
@@ -33,6 +34,31 @@ export default function Inbox() {
   const [selected, setSelected] = useState<TriagedMessage | null>(null);
   const [run, setRun] = useState<AgentRun | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [voice, setVoice] = useState<{ text: string; ms: number } | null>(null);
+
+  async function sendVoiceNote(file: File | null) {
+    if (!file) return;
+    setSelected(null);
+    setRun(null);
+    setVoice(null);
+    setError("");
+    setDrafting(true);
+    try {
+      const form = new FormData();
+      form.append("audio", file);
+      form.append("postId", "post_ig_bs01");
+      const res = await fetch("/api/voice", { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? "Voice note failed");
+      setVoice({ text: json.transcript.text, ms: json.timings.transcribe });
+      setSelected({ ...json.classification, text: json.transcript.text });
+      setRun(json.run);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   async function triage() {
     setBusy(true);
@@ -54,6 +80,7 @@ export default function Inbox() {
   }
 
   async function draft(item: TriagedMessage) {
+    setVoice(null);
     setSelected(item);
     setRun(null);
     setDrafting(true);
@@ -78,6 +105,7 @@ export default function Inbox() {
 
   return (
     <main>
+      <nav className="nav"><span>Inbox</span><Link href="/catalogue">Catalogue</Link></nav>
       <h1>SellAI</h1>
       <p className="sub">Paste comments or DMs. SellAI finds the buyers and drafts replies from your real catalogue.</p>
       {error && <p className="err">{error}</p>}
@@ -89,6 +117,12 @@ export default function Inbox() {
           <div className="row">
             <button onClick={triage} disabled={busy}>{busy ? "Triaging…" : "Triage"}</button>
             {items.length > 0 && <span className="gloss">{items.length} messages · {buyers} ready to buy · {meta}</span>}
+          </div>
+
+          <div className="voice">
+            <strong>Voice note</strong>
+            <p className="gloss">Upload a WhatsApp voice note (.ogg, .opus, .m4a, .mp3, .wav). It's transcribed, triaged and answered like a text.</p>
+            <input type="file" accept="audio/*,.ogg,.opus" disabled={drafting} onChange={(e) => sendVoiceNote(e.target.files?.[0] ?? null)} />
           </div>
 
           <div style={{ marginTop: 12 }}>
@@ -106,6 +140,7 @@ export default function Inbox() {
         <section className="panel">
           <strong>Draft reply</strong>
           {!selected && <p className="gloss">Pick a message to draft a reply.</p>}
+          {voice && <p className="gloss">🎙 Transcribed by Muse Voice Transcribe in {(voice.ms / 1000).toFixed(1)}s</p>}
           {selected && <p className="gloss">Replying to: “{selected.text}”</p>}
           {drafting && <p className="gloss">Checking catalogue, stock and delivery…</p>}
           {run && (

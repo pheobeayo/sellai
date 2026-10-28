@@ -18,11 +18,12 @@ SellAI:
 
 | Job | Model |
 |---|---|
-| Sales agent: tool calling over catalogue, stock, delivery and orders | Muse Spark (Meta Model API) |
-| High-volume comment triage | Muse Spark Open on Baseten (falls back to Muse Spark) |
-| WhatsApp voice notes → text | Muse Voice Transcribe |
-| Product photo/video → catalogue entry *(in progress)* | SAM 3.1 + Muse Spark vision |
-| Catalogue images *(planned)* | Muse Image |
+| Sales agent: tool calling over catalogue, stock, delivery and orders | Muse Spark 1.3 |
+| High-volume comment triage | Muse Spark 1.3, or Muse Spark Open on Baseten |
+| WhatsApp voice notes → text, biased with the vendor's own product words | Muse Voice Transcribe 1.0 |
+| Photo → listing: name the product and describe only what's visible | Muse Spark 1.3 (vision) |
+| Photo → listing: find and cut the product out of the photo | SAM 3.1 |
+| Photo → listing: clean catalogue shot from the cut-out | Muse Image 1.0 |
 
 ## Architecture
 
@@ -60,6 +61,8 @@ npm run ping                # confirms key + model work
 npm run selftest            # offline checks, no key needed
 npm run eval                # scores the classifier on the labelled set
 npm run agent:demo          # runs the agent on 4 realistic messages and prints tool traces
+npm run voice:demo -- note.ogg        # voice note → transcript → intent → reply draft
+npm run catalogue:demo -- photo.jpg   # photo → description, SAM cut-out, studio shot → out/
 npm run dev                 # http://localhost:3000
 ```
 
@@ -71,10 +74,18 @@ npm run dev                 # http://localhost:3000
 
 The paste/CSV inbox works without any of this, so the demo never depends on a live webhook.
 
+## Photo to listing
+
+`/catalogue`: the vendor uploads a product photo. Muse Spark describes only what is visible and lists what the photo
+can't prove (hair type, exact length) for the vendor to confirm. SAM 3.1 segments the product, the mask becomes the
+alpha channel of a cut-out, and Muse Image turns the cut-out into a studio shot with a strict "change nothing about the
+product" prompt. The vendor enters prices and stock and publishes; the agent can sell the item straight away.
+
 ## Guardrails
 
 - The agent never sends anything; every draft waits for the vendor's approval.
 - Prices, stock and delivery fees can only come from tool results; ungrounded amounts trigger a self-repair and are flagged in the UI.
 - The agent never shares or invents bank details.
 - Complaints and refunds always escalate to a human.
+- Listings never get AI-generated prices or stock, and AI-enhanced images are labelled so the vendor checks them against the real item.
 - No scraping: only the vendor's own posts and messages through Meta's official APIs.

@@ -10,6 +10,7 @@ export interface Store {
   vendor(): Vendor;
   products(): Product[];
   product(id: string): Product | undefined;
+  addProduct(p: Product): void;
   deliveryZones(): DeliveryZone[];
   post(id: string): Post | undefined;
   posts(): Post[];
@@ -25,10 +26,15 @@ export interface Store {
 class MemoryStore implements Store {
   private _enquiries: Enquiry[] = [];
   private _orders: Order[] = [];
+  private _products: Product[] = [...seedProducts];
 
   vendor() { return seedVendor; }
-  products() { return seedProducts; }
-  product(id: string) { return seedProducts.find((p) => p.id === id); }
+  products() { return this._products; }
+  product(id: string) { return this._products.find((p) => p.id === id); }
+  addProduct(p: Product) {
+    if (this.product(p.id)) throw new Error(`Product ${p.id} already exists`);
+    this._products.push(p);
+  }
   deliveryZones() { return seedDeliveryZones; }
   post(id: string) { return seedPosts.find((p) => p.id === id); }
   posts() { return seedPosts; }
