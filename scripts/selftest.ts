@@ -171,4 +171,24 @@ assert.ok(dash.totals.avgReplyMinutes !== null && dash.totals.avgReplyMinutes >=
 assert.ok(!dash.posts.some((p) => p.postId === "(no post)"), "no unattributed messages in this test");
 assert.equal(dash.hasDemoData, false);
 
+// ── Conversation history for multi-message sales ──────────────────────────
+const { buildHistory } = await import("@/inbox/pipeline");
+const t0 = Date.now() - 3600_000;
+const at = (min: number) => new Date(t0 + min * 60_000).toISOString();
+await store.addEnquiry({ id: "conv_1", channel: "whatsapp", text: "how much be the body wave 18 inches? I dey Lekki", authorHandle: "2348099990000", postId: "post_fb_bw01", receivedAt: at(0) });
+await approveAndSend("conv_1", "Body wave 18 inches na ₦52,000, delivery to Lekki na ₦3,500. You wan order?", { force: true });
+await store.addEnquiry({ id: "conv_other", channel: "whatsapp", text: "someone else's message", authorHandle: "2348011110000", receivedAt: at(1) });
+await store.addEnquiry({ id: "conv_old", channel: "whatsapp", text: "two days ago", authorHandle: "2348099990000", receivedAt: new Date(t0 - 48 * 3600_000).toISOString() });
+await store.addEnquiry({ id: "conv_2", channel: "whatsapp", text: "yes o, I wan order one", authorHandle: "2348099990000", receivedAt: at(2) });
+
+const follow = (await store.enquiry("conv_2"))!;
+const earlier = await store.conversationBefore(follow);
+assert.deepEqual(earlier.map((m) => m.id), ["conv_1"], "same customer, same channel, last 24h only");
+const hist = buildHistory(earlier);
+assert.equal(hist.length, 2);
+assert.equal(hist[0].role, "user");
+assert.equal(hist[1].role, "assistant");
+assert.match(String(hist[1].content), /₦52,000/, "history carries what we actually sent");
+assert.equal((await store.conversationBefore({ id: "x", channel: "whatsapp", receivedAt: at(3) })).length, 0, "no handle, no history");
+
 console.log("selftest: all checks passed");

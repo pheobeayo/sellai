@@ -2,6 +2,7 @@ import { classifyBatch } from "@/agent/classify";
 import { checkGrounding } from "@/agent/grounding";
 import { INTENT_PRIORITY } from "@/agent/intents";
 import { runSalesAgent } from "@/agent/sales-agent";
+import type OpenAI from "openai";
 import type { DraftMeta, Enquiry, EnquiryRecord, Order } from "@/domain/types";
 import { parseAttribution } from "@/integrations/attribution";
 import { store } from "@/store/store";
@@ -98,15 +99,35 @@ export async function ingest(items: Enquiry[], opts: IngestOptions = {}): Promis
 }
 
 /** Run the sales agent for one stored enquiry and save the draft on it. */
+/**
+ * The conversation so far, as chat messages: what the customer said and what we actually sent.
+ * Unsent drafts are left out, because the customer never saw them.
+ */
+export function buildHistory(earlier: EnquiryRecord[]): OpenAI.ChatCompletionMessageParam[] {
+  const history: OpenAI.ChatCompletionMessageParam[] = [];
+  for (const m of earlier) {
+    history.push({ role: "user", content: m.text });
+    if (m.replyText) history.push({ role: "assistant", content: m.replyText });
+  }
+  return history;
+}
+
 export async function draftReplyFor(id: string): Promise<EnquiryRecord> {
   const e = await store.enquiry(id);
   if (!e) throw new Error(`Enquiry ${id} not found`);
+
+  const earlier = await store.conversationBefore(e);
+  // "yes I wan order one" on WhatsApp belongs to the post the conversation started from.
+  const postId = e.postId ?? [...earlier].reverse().find((m) => m.postId)?.postId;
+  if (postId && !e.postId) await store.setEnquiryPost(e.id, postId);
+
   const run = await runSalesAgent({
     message: e.text,
     channel: e.channel,
-    postId: e.postId,
+    postId,
     customerHandle: e.authorHandle,
     enquiryId: e.id,
+    history: buildHistory(earlier),
   });
   const meta: DraftMeta = {
     steps: run.steps,

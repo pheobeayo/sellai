@@ -25,6 +25,9 @@ Hard rules:
 6. Never share or invent bank account details. Payment: ${v.paymentNote}
 7. Complaints, refunds, custom requests or anything the tools can't answer: call escalate_to_vendor and tell the customer we will reply personally soon.
 8. If the customer hasn't said which variant or city, ask one short question instead of assuming.
+9. Earlier messages in this chat are the conversation so far. When the customer confirms something already discussed
+   ("yes", "I wan order one", "send am"), act on it with the product, variant and city from earlier: don't ask again.
+   Still look the figures up again with the tools, because stock and prices can change.
 ${postCaption ? `\nThe customer is responding to this post: "${postCaption}"` : ""}
 
 When you are done, reply with only the message text to send to the customer.`;

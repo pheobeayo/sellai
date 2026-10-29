@@ -154,6 +154,25 @@ export const store = {
     return rows[0] ? toEnquiry(rows[0]) : undefined;
   },
 
+  /**
+   * Earlier messages from the same customer on the same channel, oldest first.
+   * WhatsApp allows free-form replies within 24 hours of the customer's last message,
+   * so a 24-hour window is also a natural "this conversation" boundary.
+   */
+  async conversationBefore(e: { id: string; channel: string; authorHandle?: string; receivedAt: string }, limit = 6, windowHours = 24): Promise<EnquiryRecord[]> {
+    if (!e.authorHandle) return [];
+    const { rows } = await (await db()).query(
+      `select * from (
+         select * from enquiries
+         where channel = $1 and author_handle = $2 and id <> $3
+           and received_at <= $4 and received_at >= ($4::timestamptz - ($5 || ' hours')::interval)
+         order by received_at desc limit $6
+       ) recent order by received_at asc`,
+      [e.channel, e.authorHandle, e.id, e.receivedAt, String(windowHours), limit],
+    );
+    return rows.map(toEnquiry);
+  },
+
   async enquiries(limit = 200): Promise<EnquiryRecord[]> {
     const { rows } = await (await db()).query("select * from enquiries order by received_at desc limit $1", [limit]);
     return rows.map(toEnquiry);
@@ -184,6 +203,11 @@ export const store = {
   },
 
   /** Link a message to an order; a message with no post of its own inherits the order's post, so the dashboard credits the right post. */
+  /** A follow-up message without its own post inherits the conversation's post, so its order credits the right post. */
+  async setEnquiryPost(id: string, postId: string): Promise<void> {
+    await (await db()).query(`update enquiries set post_id = coalesce(post_id, $2) where id = $1`, [id, postId]);
+  },
+
   async linkEnquiryToOrder(id: string, ref: string): Promise<void> {
     await (await db()).query(
       `update enquiries e set order_ref = $2, post_id = coalesce(e.post_id, o.source_post_id) from orders o where e.id = $1 and o.ref = $2`,
