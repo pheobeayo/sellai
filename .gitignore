@@ -6,3 +6,4 @@ node_modules
 next-env.d.ts
 eval/results-*.json
 out/
+.data/

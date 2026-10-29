@@ -13,6 +13,8 @@ export interface ToolContext {
   channel: Channel;
   postId?: string;
   customerHandle?: string;
+  /** The stored enquiry this run is answering, so orders link back to it. */
+  enquiryId?: string;
 }
 
 export interface ToolResult {
@@ -107,8 +109,8 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const a = SearchArgs.safeParse(json);
       if (!a.success) return { ok: false, error: a.error.message };
       const terms = a.data.query.toLowerCase().split(/\s+/).filter(Boolean);
-      const scored = store
-        .products()
+      const all = await store.products();
+      const scored = all
         .map((p) => {
           const hay = [p.name, p.description, p.category, ...p.tags, ...p.variants.map((v) => v.label)].join(" ").toLowerCase();
           return { p, score: terms.filter((t) => hay.includes(t)).length };
@@ -117,7 +119,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         .sort((x, y) => y.score - x.score)
         .slice(0, 5);
       // Return variants with price and stock so the agent can usually answer without a second call.
-      const products = scored.length ? scored.map((x) => x.p) : store.products();
+      const products = scored.length ? scored.map((x) => x.p) : all;
       const matches = products.map((p) => ({
         product_id: p.id,
         name: p.name,
@@ -130,7 +132,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
     case "get_product": {
       const a = ProductArgs.safeParse(json);
       if (!a.success) return { ok: false, error: a.error.message };
-      const p = store.product(a.data.product_id);
+      const p = await store.product(a.data.product_id);
       if (!p) return { ok: false, error: `No product with id ${a.data.product_id}` };
       return {
         ok: true,
@@ -161,7 +163,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
     case "create_order_draft": {
       const a = OrderArgs.safeParse(json);
       if (!a.success) return { ok: false, error: a.error.message };
-      const p = store.product(a.data.product_id);
+      const p = await store.product(a.data.product_id);
       const v = p?.variants.find((x) => x.id === a.data.variant_id);
       if (!p || !v) return { ok: false, error: "Unknown product or variant. Call get_product first." };
       if (v.stock < a.data.quantity) return { ok: false, error: `Only ${v.stock} left of ${v.label}. Offer another variant.` };
@@ -179,11 +181,13 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         customerHandle: ctx.customerHandle,
         channel: ctx.channel,
         sourcePostId: ctx.postId,
-        status: "draft_awaiting_vendor",
+        sourceEnquiryId: ctx.enquiryId,
+        status: "draft",
         createdAt: new Date().toISOString(),
         linkClicks: 0,
       };
-      store.addOrder(order);
+      await store.addOrder(order);
+      if (ctx.enquiryId) await store.linkEnquiryToOrder(ctx.enquiryId, order.ref);
       // Short tracked link: /o/<ref> records the click, then redirects to WhatsApp with the ref prefilled.
       const link = checkoutShortLink(order.ref);
       return {

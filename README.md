@@ -49,7 +49,7 @@ flowchart TD
         TR --> WH
         PASTE[Paste or CSV in inbox] --> T
         WH --> T["Triage: Muse Spark 1.3<br/>or Muse Spark Open<br/>intent · language · priority"]
-        T --> INBOX[Inbox sorted: buyers first]
+        T --> INBOX["Inbox sorted: buyers first<br/>replies auto-drafted"]
     end
 
     subgraph R["3 · Reply"]
@@ -59,7 +59,7 @@ flowchart TD
         AG --> G{"Price check:<br/>every ₦ from a tool?"}
         G -- no --> AG
         G -- yes --> DR[Draft reply]
-        DR --> AP[Vendor approves + sends]
+        DR --> AP["Vendor approves<br/>amounts re-checked, sent on WhatsApp"]
         AG -. complaint .-> ESC[Escalated to vendor]
     end
 
@@ -68,7 +68,9 @@ flowchart TD
         ORD --> LNK["Short link /o/SA-XXXX in reply"]
         LNK --> CLK[Buyer taps: click recorded]
         CLK --> WA["WhatsApp chat opens with<br/>order ref + source post prefilled"]
-        ORD --> API["/api/orders<br/>order · post · clicks"]
+        WA --> CONF["Buyer sends it: order confirmed,<br/>confirmation reply drafted"]
+        CONF --> PAID[Vendor marks paid: stock deducted]
+        PAID --> DASH["Dashboard: revenue per post,<br/>funnel, Muse Spark insights"]
     end
 ```
 
@@ -83,25 +85,32 @@ On `/catalogue` the vendor uploads a product photo:
 
 ### 2. Messages in
 
-Instagram comments, Facebook comments and WhatsApp messages arrive through one webhook and are normalised into one message shape. WhatsApp voice notes are converted from OGG/Opus to WAV and transcribed by **Muse Voice Transcribe**, with the vendor's product names and delivery cities sent as keyword hints. Comments can also be pasted into the inbox, so the demo never depends on a live webhook.
+Instagram comments, Facebook comments and WhatsApp messages arrive through one webhook, which answers Meta immediately and does the work in the background. Messages are saved once (Meta retries webhooks, so saving is idempotent) and normalised into one shape. WhatsApp voice notes are converted from OGG/Opus to WAV and transcribed by **Muse Voice Transcribe**, with the vendor's product names and delivery cities sent as keyword hints. Comments can also be pasted into the inbox, so the demo never depends on a live webhook.
 
-**Triage** labels every message with intent, language and an English meaning, then sorts the inbox so ready-to-buy messages and complaints come first.
+**Triage** labels every message with intent, language and an English meaning, then sorts the inbox so ready-to-buy messages and complaints come first. Messages that need an answer get a reply drafted automatically, so it's waiting when the vendor opens the inbox.
 
 ### 3. Reply
 
-When the vendor opens a message, the **sales agent** (Muse Spark 1.3) looks up the real catalogue, stock and delivery fees with tool calls, and drafts a reply in the customer's own language. Before the vendor sees the draft, every ₦ amount is checked against tool results. An amount no tool returned triggers one self-correction and is flagged if it remains. Complaints and refunds always escalate to the vendor. Nothing is sent without the vendor's approval.
+For each message that needs an answer, the **sales agent** (Muse Spark 1.3) looks up the real catalogue, stock and delivery fees with tool calls, and drafts a reply in the customer's own language. Before the vendor sees the draft, every ₦ amount is checked against tool results. An amount no tool returned triggers one self-correction and is flagged if it remains. Complaints and refunds always escalate to the vendor. Nothing is sent without the vendor's approval, and if the vendor edits the draft, every ₦ amount is checked again before it goes out. WhatsApp replies are sent through the WhatsApp Cloud API; comment replies are copied for the vendor to paste.
 
 ### 4. Order and attribution
 
-When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the post the message came from, and puts a short link in the reply. When the buyer taps it, the click is recorded and WhatsApp opens with the order reference and source post filled in. `/api/orders` lists each order with its source post and click count.
+When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the message and the post it came from, and puts a short link in the reply. When the buyer taps it, the click is recorded and WhatsApp opens with the order reference filled in. When they send that message, the order is confirmed automatically and a confirmation reply is drafted using the exact figures from the order. The vendor marks it paid, which deducts stock.
+
+### 5. Dashboard
+
+`/dashboard` answers "which of my posts actually brings in money?". For each post it shows messages, buyers found, links opened, confirmed and paid orders, revenue, buyer-to-paid conversion and average reply time, plus the overall funnel. **Muse Spark insights** read only those aggregated numbers and suggest what to post next. Any insight quoting a ₦ amount that isn't in the data is dropped, and a small-sample warning is added in code when there are fewer than 5 orders.
 
 ### Roadmap
 
-- [ ] Attribution dashboard: revenue per post and the enquiry → click → order funnel
-- [ ] Read the order reference from incoming WhatsApp messages and mark the order confirmed
-- [ ] Auto-triage messages arriving through the webhook
-- [ ] Send approved replies through the WhatsApp Cloud API
-- [ ] Persistent database for catalogue and orders
+- [x] Attribution dashboard: revenue per post and the enquiry → click → order funnel
+- [x] Read the order reference from incoming WhatsApp messages and mark the order confirmed
+- [x] Auto-triage and auto-draft messages arriving through the webhook
+- [x] Send approved replies through the WhatsApp Cloud API
+- [x] Persistent database (Supabase Postgres, or local PGlite with no setup)
+- [ ] Independent verification checks and autopilot for low-risk replies
+- [ ] Agent scenario test suite with a published pass rate
+- [ ] Reply to Instagram and Facebook comments through the Graph API
 
 ### Key files
 
@@ -112,6 +121,10 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - `src/ai/transcribe.ts`, `src/ai/audio.ts` – voice note conversion and Muse Voice Transcribe with catalogue keywords
 - `src/ai/describe.ts`, `src/ai/segment.ts`, `src/ai/product-image.ts` – Muse Spark vision, SAM 3.1 and Muse Image steps
 - `src/catalogue/listing.ts` – the photo-to-listing pipeline and publishing
+- `src/inbox/pipeline.ts` – save, order-ref matching, triage and auto-draft for every incoming message
+- `src/inbox/send.ts` – vendor approval: re-checks amounts, sends on WhatsApp
+- `src/dashboard/metrics.ts`, `src/dashboard/insights.ts` – per-post attribution in SQL, grounded insights
+- `src/db/` – schema and the Postgres / PGlite client
 - `src/integrations/` – Meta webhook normalisation and signature check, WhatsApp send/media, attribution links
 - `eval/comments.jsonl` – 60 labelled comments in English, Pidgin, Yoruba, Igbo and Hausa
 
@@ -127,6 +140,21 @@ npm run agent:demo          # runs the agent on 4 realistic messages and prints 
 npm run voice:demo -- note.ogg        # voice note → transcript → intent → reply draft
 npm run catalogue:demo -- photo.jpg   # photo → description, SAM cut-out, studio shot → out/
 npm run dev                 # http://localhost:3000
+```
+
+The app uses Supabase when `DATABASE_URL` is set, and otherwise a local database in `.data/pglite` with no setup. Tables are created on first start (`supabase/schema.sql` has the same SQL). The CLI demos and self-test always use a throwaway in-memory database.
+
+### Test the full loop without the Meta app
+
+```bash
+npm run dev
+npm run seed:demo                              # a labelled week of demo activity for the dashboard
+npm run simulate:whatsapp -- "abeg how much be the body wave 18 inches? I dey Lekki"
+#   → inbox: triaged and drafted within seconds. Approve it; the draft has a checkout link /o/SA-XXXX
+#   → open that link in a browser (records the click), then:
+npm run simulate:whatsapp -- --order SA-XXXX   # the buyer's prefilled WhatsApp message
+#   → order confirmed, confirmation reply drafted. Mark it paid on /dashboard.
+npm run seed:demo -- --clear                   # remove demo rows before recording with real data
 ```
 
 ### Webhooks (optional for the demo)

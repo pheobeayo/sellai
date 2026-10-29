@@ -5,5 +5,5 @@ export const runtime = "nodejs";
 
 /** The live catalogue the agent sells from. */
 export async function GET() {
-  return NextResponse.json({ products: store.products() });
+  return NextResponse.json({ products: await store.products() });
 }

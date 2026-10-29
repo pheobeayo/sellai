@@ -110,7 +110,7 @@ export interface PublishInput {
 }
 
 /** The vendor confirms prices, stock and wording; the product then becomes sellable by the agent immediately. */
-export function publishListing(input: PublishInput): Product {
+export async function publishListing(input: PublishInput): Promise<Product> {
   if (input.variants.length === 0) throw new Error("Add at least one variant with a price");
   const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "item";
   const id = `p_${slug}_${randomBytes(2).toString("hex")}`;
@@ -129,6 +129,6 @@ export function publishListing(input: PublishInput): Product {
     imageUrl: input.imageUrl,
     imageIsAiEnhanced: input.imageIsAiEnhanced,
   };
-  store.addProduct(product);
+  await store.addProduct(product);
   return product;
 }

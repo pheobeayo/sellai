@@ -3,15 +3,17 @@ import { store } from "@/store/store";
 
 export const runtime = "nodejs";
 
-/** Orders with their source post and link clicks: the raw data for the post → sale dashboard. */
+/** Orders with item names and source post captions. */
 export async function GET() {
-  const orders = store.orders().map((o) => {
-    const product = store.product(o.productId);
-    return {
-      ...o,
-      item: `${product?.name ?? o.productId} (${product?.variants.find((v) => v.id === o.variantId)?.label ?? o.variantId})`,
-      sourcePostCaption: o.sourcePostId ? store.post(o.sourcePostId)?.caption : undefined,
-    };
+  const [orders, products, posts] = await Promise.all([store.orders(), store.products(), store.posts()]);
+  return NextResponse.json({
+    orders: orders.map((o) => {
+      const p = products.find((x) => x.id === o.productId);
+      return {
+        ...o,
+        item: `${p?.name ?? o.productId} (${p?.variants.find((v) => v.id === o.variantId)?.label ?? o.variantId})`,
+        sourcePostCaption: posts.find((x) => x.id === o.sourcePostId)?.caption || undefined,
+      };
+    }),
   });
-  return NextResponse.json({ orders });
 }

@@ -43,6 +43,8 @@ export interface AgentRun {
   escalated: boolean;
   grounding: GroundingReport;
   repaired: boolean;
+  /** Every ₦ amount the tools returned in this run; lets the UI re-check a draft after the vendor edits it. */
+  groundedAmounts: number[];
   model: string;
   usage: { prompt_tokens: number; completion_tokens: number };
 }
@@ -52,14 +54,15 @@ export async function runSalesAgent(input: {
   channel: ToolContext["channel"];
   postId?: string;
   customerHandle?: string;
+  enquiryId?: string;
   history?: OpenAI.ChatCompletionMessageParam[];
 }): Promise<AgentRun> {
   const client = meta();
-  const post = input.postId ? store.post(input.postId) : undefined;
-  const ctx: ToolContext = { channel: input.channel, postId: input.postId, customerHandle: input.customerHandle };
+  const post = input.postId ? await store.post(input.postId) : undefined;
+  const ctx: ToolContext = { channel: input.channel, postId: input.postId, customerHandle: input.customerHandle, enquiryId: input.enquiryId };
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt(post?.caption) },
+    { role: "system", content: systemPrompt(post?.caption || undefined) },
     ...(input.history ?? []),
     { role: "user", content: input.message },
   ];
@@ -120,7 +123,7 @@ export async function runSalesAgent(input: {
       continue;
     }
 
-    return { draftReply: draft, steps, orderRefs, escalated, grounding: report, repaired, model: MODELS.agent, usage };
+    return { draftReply: draft, steps, orderRefs, escalated, grounding: report, repaired, groundedAmounts: [...grounded], model: MODELS.agent, usage };
   }
 
   throw new Error(`Agent did not finish within ${MAX_STEPS} steps`);

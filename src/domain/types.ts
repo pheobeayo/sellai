@@ -47,13 +47,58 @@ export interface Enquiry {
   id: string;
   channel: Channel;
   text: string;
+  /** Instagram username, Facebook name, or WhatsApp number (wa_id). Replies on WhatsApp go to this. */
   authorHandle?: string;
+  authorName?: string;
   postId?: string;
   receivedAt: string;
   transcribedFromVoice?: boolean;
+  isDemo?: boolean;
 }
 
-export type OrderStatus = "draft_awaiting_vendor" | "confirmed" | "paid" | "cancelled";
+/**
+ * new        – arrived, not yet triaged or drafted
+ * drafted    – a reply draft is waiting for the vendor
+ * escalated  – needs the vendor personally (complaint, refund, custom request)
+ * replied    – the vendor approved and sent (or copied) a reply
+ * ignored    – casual engagement or spam, nothing to answer
+ */
+export type EnquiryStatus = "new" | "drafted" | "escalated" | "replied" | "ignored";
+
+export interface DraftMeta {
+  steps: Array<{ tool: string; args: unknown; result: unknown }>;
+  groundedAmounts: number[];
+  grounding: { ok: boolean; ungrounded: number[] };
+  repaired: boolean;
+  orderRefs: string[];
+  escalated: boolean;
+  model: string;
+  usage: { prompt_tokens: number; completion_tokens: number };
+  /** "agent" for Muse Spark drafts, "template" for deterministic order confirmations. */
+  source: "agent" | "template";
+}
+
+export interface EnquiryRecord extends Enquiry {
+  intent?: string;
+  language?: string;
+  englishGloss?: string;
+  confidence?: number;
+  priority: number;
+  status: EnquiryStatus;
+  draftReply?: string;
+  draftMeta?: DraftMeta;
+  replyText?: string;
+  repliedAt?: string;
+  orderRef?: string;
+}
+
+/**
+ * draft      – the agent created it and sent the buyer a checkout link
+ * confirmed  – the buyer tapped the link and messaged the order ref on WhatsApp
+ * paid       – the vendor confirmed payment (stock is deducted here)
+ * cancelled  – the vendor cancelled it
+ */
+export type OrderStatus = "draft" | "confirmed" | "paid" | "cancelled";
 
 export interface Order {
   ref: string; // short reference code shared with the buyer, e.g. SA-7K2P
@@ -67,9 +112,13 @@ export interface Order {
   customerHandle?: string;
   channel: Channel;
   sourcePostId?: string;
+  sourceEnquiryId?: string;
   status: OrderStatus;
   createdAt: string;
   /** Times the buyer opened the checkout link. Funnel: enquiry → link clicked → order confirmed. */
   linkClicks: number;
   firstClickedAt?: string;
+  confirmedAt?: string;
+  paidAt?: string;
+  isDemo?: boolean;
 }

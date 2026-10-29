@@ -28,4 +28,4 @@ for (const s of run.steps) console.log(`  → ${s.tool}(${JSON.stringify(s.args)
 console.log(`DRAFT: ${run.draftReply}`);
 console.log(`grounding: ${run.grounding.ok ? "OK" : "FLAGGED"} · ${((Date.now() - t) / 1000).toFixed(1)}s`);
 
-console.log(`\n(keywords sent: ${catalogueKeywords().slice(0, 8).join(", ")}…)`);
+console.log(`\n(keywords sent: ${(await catalogueKeywords()).slice(0, 8).join(", ")}…)`);

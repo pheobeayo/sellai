@@ -10,10 +10,10 @@ export const runtime = "nodejs";
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ ref: string }> }) {
   const { ref } = await params;
-  const order = store.recordClick(ref.toUpperCase());
+  const order = await store.recordClick(ref.toUpperCase());
   if (!order) return new Response("This order link has expired or does not exist.", { status: 404 });
 
-  const product = store.product(order.productId);
+  const product = await store.product(order.productId);
   const variant = product?.variants.find((v) => v.id === order.variantId);
   const target = whatsappCheckoutLink({
     vendorNumber: store.vendor().whatsappNumber,

@@ -33,4 +33,4 @@ for (const c of cases) {
   }
 }
 
-console.log(`\n${passed}/${cases.length} cases completed · draft orders created: ${store.orders().length}`);
+console.log(`\n${passed}/${cases.length} cases completed · draft orders created: ${(await store.orders()).length}`);

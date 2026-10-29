@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: { code: "bad_request", message: parsed.error.message } }, { status: 400 });
   try {
-    const product = publishListing(parsed.data);
+    const product = await publishListing(parsed.data);
     return NextResponse.json({ product: { ...product, imageUrl: product.imageUrl ? "(stored)" : undefined } });
   } catch (e) {
     return NextResponse.json({ error: { code: "publish_failed", message: (e as Error).message } }, { status: 400 });

@@ -12,8 +12,10 @@ export function verifySignature(rawBody: string, header: string | null, appSecre
 
 /** A WhatsApp voice note that still needs downloading and transcribing. */
 export interface PendingVoiceNote {
+  messageId: string;
   mediaId: string;
   from: string;
+  fromName?: string;
   receivedAt: string;
 }
 
@@ -69,12 +71,14 @@ export function normalizeWebhook(body: WebhookPayload): NormalizedEvents {
 
       // WhatsApp Cloud API: field "messages"
       if (body.object === "whatsapp_business_account" && change.field === "messages") {
+        const contacts = (v.contacts ?? []) as Array<{ wa_id?: string; profile?: { name?: string } }>;
+        const nameOf = (waId: string) => contacts.find((c) => c.wa_id === waId)?.profile?.name;
         for (const m of (v.messages ?? []) as Array<Record<string, any>>) {
           const receivedAt = new Date(Number(m.timestamp ?? Date.now() / 1000) * 1000).toISOString();
           if (m.type === "text" && m.text?.body) {
-            out.enquiries.push({ id: `wa_${m.id}`, channel: "whatsapp", text: m.text.body, authorHandle: m.from, receivedAt });
+            out.enquiries.push({ id: `wa_${m.id}`, channel: "whatsapp", text: m.text.body, authorHandle: m.from, authorName: nameOf(m.from), receivedAt });
           } else if (m.type === "audio" && m.audio?.id) {
-            out.voiceNotes.push({ mediaId: m.audio.id, from: m.from, receivedAt });
+            out.voiceNotes.push({ messageId: m.id, mediaId: m.audio.id, from: m.from, fromName: nameOf(m.from), receivedAt });
           }
         }
       }

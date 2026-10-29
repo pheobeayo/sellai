@@ -19,9 +19,9 @@ export interface Transcript {
  * Words the recogniser should expect: product names, styles and delivery cities from the vendor's own data.
  * This is what keeps "bone straight" from becoming "bone strait" in a noisy voice note.
  */
-export function catalogueKeywords(limit = 60): string[] {
+export async function catalogueKeywords(limit = 60): Promise<string[]> {
   const words = new Set<string>();
-  for (const p of store.products()) {
+  for (const p of await store.products()) {
     words.add(p.name);
     p.tags.forEach((t) => words.add(t));
     p.variants.forEach((v) => words.add(v.label));
@@ -36,7 +36,7 @@ export async function transcribe(audio: Buffer): Promise<Transcript> {
   const base = (process.env.META_BASE_URL || "https://api.meta.ai/v1").replace(/\/+$/, "");
 
   const wav = await toTranscribableWav(audio); // always normalise: OGG/Opus, MP3, M4A, odd sample rates
-  const keywords = catalogueKeywords();
+  const keywords = await catalogueKeywords();
 
   const form = new FormData();
   form.append(

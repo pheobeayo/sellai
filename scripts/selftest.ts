@@ -36,9 +36,9 @@ assert.equal(sm[0].product_id, "p_body_wave");
 assert.ok(sm[0].variants.some((v) => v.variant_id === "v_bw_18" && v.in_stock));
 
 // Click tracking + the WhatsApp link the short link redirects to
-assert.equal(store.recordClick(od.order_ref)?.linkClicks, 1);
-assert.equal(store.recordClick(od.order_ref)?.linkClicks, 2);
-assert.equal(store.recordClick("SA-NOPE"), undefined);
+assert.equal((await store.recordClick(od.order_ref))?.linkClicks, 1);
+assert.equal((await store.recordClick(od.order_ref))?.linkClicks, 2);
+assert.equal(await store.recordClick("SA-NOPE"), undefined);
 const wa = whatsappCheckoutLink({ vendorNumber: "2348000000000", orderRef: od.order_ref, productName: "Bone Straight 24 inches", postId: "post_ig_bs01" });
 const back = parseAttribution(decodeURIComponent(wa.split("text=")[1]));
 assert.equal(back.orderRef, od.order_ref);
@@ -46,13 +46,14 @@ assert.equal(back.postId, "post_ig_bs01");
 
 const ev = normalizeWebhook({
   object: "whatsapp_business_account",
-  entry: [{ changes: [{ field: "messages", value: { messages: [
+  entry: [{ changes: [{ field: "messages", value: { contacts: [{ wa_id: "2348011111111", profile: { name: "Ada" } }], messages: [
     { id: "m1", from: "2348011111111", timestamp: "1793000000", type: "text", text: { body: "Una dey deliver Ibadan?" } },
     { id: "m2", from: "2348011111111", timestamp: "1793000001", type: "audio", audio: { id: "media123" } },
   ] } }] }],
 });
 assert.equal(ev.enquiries.length, 1);
 assert.equal(ev.voiceNotes[0].mediaId, "media123");
+assert.equal(ev.enquiries[0].authorName, "Ada", "WhatsApp sender name comes from contacts");
 
 // ── Media pipeline (offline) ──────────────────────────────────────────────
 
@@ -109,9 +110,65 @@ assert.ok(segOut.diagnostics.some((d) => d.startsWith("malformed_record")));
 
 // 5. Publishing a listing makes it sellable by the agent's tools
 const { publishListing } = await import("@/catalogue/listing");
-const pub = publishListing({ name: "Burgundy Bob Wig", category: "Wigs", description: "Short burgundy bob.", tags: ["bob", "burgundy"], variants: [{ label: "10 inches", priceNaira: 45000, stock: 3 }] });
+const pub = await publishListing({ name: "Burgundy Bob Wig", category: "Wigs", description: "Short burgundy bob.", tags: ["bob", "burgundy"], variants: [{ label: "10 inches", priceNaira: 45000, stock: 3 }] });
 const found = await runTool("search_catalogue", JSON.stringify({ query: "burgundy bob" }), ctx);
 assert.equal((found.data as { matches: Array<{ product_id: string }> }).matches[0].product_id, pub.id);
 assert.ok(found.groundedAmounts?.includes(45000));
+
+// ── WhatsApp loop and dashboard (offline: no model calls) ─────────────────
+const { ingest } = await import("@/inbox/pipeline");
+const { approveAndSend, UngroundedReplyError } = await import("@/inbox/send");
+const { getDashboard } = await import("@/dashboard/metrics");
+
+// The agent created a draft order for an Instagram comment (simulated here with the tool directly)
+await store.addEnquiry({ id: "t_ig_1", channel: "instagram_comment", text: "I want the 20 inches, I'm in Wuse", postId: "post_ig_bs01", receivedAt: new Date(Date.now() - 600_000).toISOString() });
+const ord2 = await runTool("create_order_draft", JSON.stringify({ product_id: "p_bone_straight", variant_id: "v_bs_20", city: "Wuse" }), { ...ctx, enquiryId: "t_ig_1" });
+const ref2 = (ord2.data as { order_ref: string }).order_ref;
+assert.equal((await store.enquiry("t_ig_1"))?.orderRef, ref2, "order links back to its enquiry");
+assert.equal((await store.order(ref2))?.sourceEnquiryId, "t_ig_1");
+
+// Buyer taps the link, then WhatsApp delivers the prefilled message: the order confirms itself
+await store.recordClick(ref2);
+const waText = decodeURIComponent(whatsappCheckoutLink({ vendorNumber: "234", orderRef: ref2, productName: "Bone Straight 20 inches", postId: "post_ig_bs01" }).split("text=")[1]);
+const r1 = await ingest([{ id: "wa_t1", channel: "whatsapp", text: waText, authorHandle: "2348011111111", authorName: "Ada", receivedAt: new Date().toISOString() }], { triage: false });
+assert.deepEqual(r1.confirmedOrders, [ref2]);
+const confirmed = await store.order(ref2);
+assert.equal(confirmed?.status, "confirmed");
+assert.equal(confirmed?.customerHandle, "2348011111111");
+const conf = await store.enquiry("wa_t1");
+assert.equal(conf?.status, "drafted");
+assert.equal(conf?.draftMeta?.source, "template");
+assert.equal(conf?.postId, "post_ig_bs01", "the WhatsApp confirmation is credited to the order's post");
+assert.match(conf?.draftReply ?? "", new RegExp(`${ref2}.*₦80,000`), "confirmation quotes the order total (75,000 + 5,000 Abuja delivery)");
+assert.ok(conf?.draftMeta?.grounding.ok);
+
+// Webhook retries are idempotent
+const r2 = await ingest([{ id: "wa_t1", channel: "whatsapp", text: waText, receivedAt: new Date().toISOString() }], { triage: false });
+assert.equal(r2.duplicates, 1);
+assert.equal(r2.confirmedOrders.length, 0);
+
+// Approving: an edited reply with an invented price is blocked; the real one goes through
+await assert.rejects(approveAndSend("wa_t1", "Total na ₦70,000"), UngroundedReplyError);
+const sent = await approveAndSend("wa_t1", conf!.draftReply!);
+assert.equal(sent.via, "manual", "without WhatsApp credentials the reply is marked replied for manual sending");
+assert.equal((await store.enquiry("wa_t1"))?.status, "replied");
+await approveAndSend("t_ig_1", "Yes o! We go send your checkout link.");
+
+// Vendor marks it paid: stock goes down by one
+const stockBefore = (await store.product("p_bone_straight"))!.variants.find((v) => v.id === "v_bs_20")!.stock;
+const paid = await store.setOrderStatus(ref2, "paid");
+assert.equal(paid.order?.status, "paid");
+assert.equal((await store.product("p_bone_straight"))!.variants.find((v) => v.id === "v_bs_20")!.stock, stockBefore - 1);
+assert.match((await store.setOrderStatus(ref2, "cancelled")).warning ?? "", /can't be cancelled/);
+
+// Dashboard attributes it all to the Instagram post
+const dash = await getDashboard(30);
+const igPost = dash.posts.find((p) => p.postId === "post_ig_bs01")!;
+assert.ok(igPost.paid >= 1 && igPost.revenueNaira >= 80_000);
+assert.ok(igPost.linksClicked >= 1);
+assert.equal(dash.totals.paid, dash.posts.reduce((n, p) => n + p.paid, 0));
+assert.ok(dash.totals.avgReplyMinutes !== null && dash.totals.avgReplyMinutes >= 0);
+assert.ok(!dash.posts.some((p) => p.postId === "(no post)"), "no unattributed messages in this test");
+assert.equal(dash.hasDemoData, false);
 
 console.log("selftest: all checks passed");
