@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { approveAndSend, UngroundedReplyError } from "@/inbox/send";
+import { approveAndSend, ReplyCheckError } from "@/inbox/send";
 import { store } from "@/store/store";
 
 export const runtime = "nodejs";
@@ -16,8 +16,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const result = await approveAndSend(id, parsed.data.text, { force: parsed.data.force });
     return NextResponse.json({ result, enquiry: await store.enquiry(id) });
   } catch (e) {
-    if (e instanceof UngroundedReplyError) {
-      return NextResponse.json({ error: { code: "ungrounded_amounts", message: e.message, details: { ungrounded: e.ungrounded } } }, { status: 422 });
+    if (e instanceof ReplyCheckError) {
+      return NextResponse.json(
+        { error: { code: "checks_failed", message: e.message, details: { failed: e.failed, ungrounded: e.ungrounded } } },
+        { status: 422 },
+      );
     }
     return NextResponse.json({ error: { code: "send_failed", message: (e as Error).message } }, { status: 502 });
   }

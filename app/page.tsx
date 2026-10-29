@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { checkGrounding } from "@/agent/grounding";
+import { runChecks, type CheckReport } from "@/agent/checks";
 import type { EnquiryRecord } from "@/domain/types";
 
 const SAMPLE = `abeg how much be the bone straight 24 inches?
@@ -47,6 +47,8 @@ export default function Inbox() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<"" | "import" | "voice" | "draft" | "send">("");
   const [needsForce, setNeedsForce] = useState(false);
+  const [autopilot, setAutopilotState] = useState(false);
+  const [settings, setSettings] = useState<{ whatsappConnected: boolean; appUrl: string }>({ whatsappConnected: false, appUrl: "" });
 
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState(SAMPLE);
@@ -103,10 +105,39 @@ export default function Inbox() {
     [enquiries],
   );
 
-  const liveCheck = useMemo(
-    () => (selected?.draftMeta ? checkGrounding(draftText, selected.draftMeta.groundedAmounts) : null),
-    [draftText, selected?.draftMeta],
-  );
+  useEffect(() => {
+    fetch("/api/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        setAutopilotState(Boolean(j.autopilot));
+        setSettings({ whatsappConnected: Boolean(j.whatsappConnected), appUrl: j.appUrl ?? "" });
+      })
+      .catch(() => {});
+  }, []);
+
+  async function toggleAutopilot() {
+    const next = !autopilot;
+    setAutopilotState(next);
+    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autopilot: next }) });
+    if (!res.ok) setAutopilotState(!next);
+    else setNotice(next ? "Autopilot on: low-risk WhatsApp answers that pass every check will send themselves." : "Autopilot off: every reply waits for you.");
+  }
+
+  // The saved checks, or a fresh run on the vendor's edit (stock is re-checked on the server when sending).
+  const liveChecks: CheckReport | null = useMemo(() => {
+    const m = selected?.draftMeta;
+    if (!m) return null;
+    if (!dirty && m.checks) return m.checks;
+    return runChecks({
+      reply: draftText,
+      groundedAmounts: m.groundedAmounts,
+      orderRefs: m.orderRefs,
+      intent: selected?.intent,
+      escalated: m.escalated,
+      customerLanguage: selected?.language,
+      appUrl: settings.appUrl || (typeof window !== "undefined" ? window.location.origin : ""),
+    });
+  }, [draftText, dirty, selected?.draftMeta, selected?.intent, selected?.language, settings.appUrl]);
 
   async function importComments() {
     setBusy("import");
@@ -187,7 +218,7 @@ export default function Inbox() {
       const json = await res.json();
       if (res.status === 422) {
         setNeedsForce(true);
-        throw new Error(json.error.message);
+        throw new Error(`${json.error.message}. Edit the reply, or send anyway if you're sure.`);
       }
       if (!res.ok) throw new Error(json.error?.message ?? "Send failed");
       setNeedsForce(false);
@@ -217,7 +248,21 @@ export default function Inbox() {
 
       <div className="grid">
         <section className="panel">
-          <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
+          <div className="autopilot">
+            <button className={`switch ${autopilot ? "on" : ""}`} role="switch" aria-checked={autopilot} onClick={toggleAutopilot}>
+              <span className="knob" />
+            </button>
+            <div>
+              <strong>Autopilot {autopilot ? "on" : "off"}</strong>
+              <div className="gloss">
+                {autopilot
+                  ? "Price, delivery and stock answers on WhatsApp send themselves when every check passes. Orders and complaints wait for you."
+                  : "Every reply waits for your approval."}
+                {autopilot && !settings.whatsappConnected && " WhatsApp isn't connected yet, so auto-sent replies are marked sent but not delivered."}
+              </div>
+            </div>
+          </div>
+          <div className="row" style={{ justifyContent: "space-between" }}>
             <div className="seg" role="group" aria-label="Filter">
               <button className={filter === "open" ? "on" : ""} onClick={() => setFilter("open")}>Needs reply ({counts.open})</button>
               <button className={filter === "replied" ? "on" : ""} onClick={() => setFilter("replied")}>Replied</button>
@@ -262,7 +307,7 @@ export default function Inbox() {
                   {m.orderRef && <span className="tag order">{m.orderRef}</span>}
                   {m.status === "drafted" && <span className="tag drafted">Draft ready</span>}
                   {m.status === "escalated" && <span className="tag complaint">Needs you</span>}
-                  {m.status === "replied" && <span className="tag">✓ Replied</span>}
+                  {m.status === "replied" && (m.autoSent ? <span className="tag auto">🤖 Auto-sent</span> : <span className="tag">✓ Replied</span>)}
                   <span className="when">{m.authorName || m.authorHandle || ""} · {ago(m.receivedAt)}</span>
                 </div>
                 <div>{m.text}</div>
@@ -291,7 +336,11 @@ export default function Inbox() {
               {selected.status === "replied" ? (
                 <>
                   <div className="draft">{selected.replyText}</div>
-                  <p className="gloss">Replied {selected.repliedAt ? ago(selected.repliedAt) : ""}</p>
+                  <p className="gloss">
+                    {selected.autoSent ? "🤖 Sent by autopilot" : "Replied"} {selected.repliedAt ? ago(selected.repliedAt) : ""}
+                    {selected.draftMeta?.autopilot && selected.autoSent ? ` · ${selected.draftMeta.autopilot.reason.toLowerCase()}` : ""}
+                  </p>
+                  {selected.draftMeta?.checks && <ChecksList report={selected.draftMeta.checks} />}
                 </>
               ) : (
                 <>
@@ -317,14 +366,18 @@ export default function Inbox() {
                           setNeedsForce(false);
                         }}
                       />
-                      <p style={{ margin: "6px 0" }}>
-                        {liveCheck?.ok ? (
-                          <span className="ok">✓ Every amount matches your catalogue{dirty ? " (rechecked after your edit)" : ""}</span>
-                        ) : (
-                          <span className="flag">⚠ Not in your catalogue: {liveCheck?.ungrounded.map((n) => `₦${n.toLocaleString("en-NG")}`).join(", ")}</span>
+                      {liveChecks && <ChecksList report={liveChecks} edited={dirty} />}
+                      {selected.draftMeta?.autopilot && (
+                        <p className={`gloss autopilot-line ${selected.draftMeta.autopilot.eligible ? "yes" : ""}`}>
+                          🤖 Autopilot: {selected.draftMeta.autopilot.eligible ? "would send this on its own" : selected.draftMeta.autopilot.reason}
+                        </p>
+                      )}
+                      <p style={{ margin: "6px 0" }} className="gloss">
+                        {selected.draftMeta?.repaired && <span>agent self-corrected once · </span>}
+                        {selected.draftMeta?.source === "template" && <span>order confirmation, figures from the order</span>}
+                        {selected.draftMeta?.source === "agent" && selected.draftMeta.historyMessages !== undefined && (
+                          <span>{selected.draftMeta.historyMessages ? `remembered ${selected.draftMeta.historyMessages} earlier message${selected.draftMeta.historyMessages > 1 ? "s" : ""} in this chat` : "first message in this chat"}</span>
                         )}
-                        {selected.draftMeta?.repaired && <span className="gloss"> · agent self-corrected once</span>}
-                        {selected.draftMeta?.source === "template" && <span className="gloss"> · order confirmation (figures from the order)</span>}
                       </p>
                       {selected.status === "escalated" && <p className="flag">Escalated: this one needs your personal attention.</p>}
                       {selected.orderRef && <p className="gloss">Order <strong>{selected.orderRef}</strong> · <Link href="/dashboard">see it on the dashboard</Link></p>}
@@ -351,5 +404,31 @@ export default function Inbox() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ChecksList({ report, edited }: { report: CheckReport; edited?: boolean }) {
+  const failed = report.checks.filter((c) => !c.ok);
+  return (
+    <details className="checks" open={failed.length > 0}>
+      <summary>
+        {report.clean ? (
+          <span className="ok">✓ All {report.checks.length} checks passed</span>
+        ) : report.passed ? (
+          <span className="warnc">✓ Safe to send · {failed.length} warning{failed.length > 1 ? "s" : ""}</span>
+        ) : (
+          <span className="flag">✗ Held: {failed.filter((c) => c.severity === "block").length} check{failed.filter((c) => c.severity === "block").length > 1 ? "s" : ""} failed</span>
+        )}
+        {edited && <span className="gloss"> · rechecked after your edit</span>}
+      </summary>
+      <ul>
+        {report.checks.map((c) => (
+          <li key={c.id} className={c.ok ? "pass" : c.severity === "block" ? "fail" : "warn"}>
+            <span aria-hidden>{c.ok ? "✓" : c.severity === "block" ? "✗" : "!"}</span> {c.label}
+            {c.detail && <span className="gloss"> · {c.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

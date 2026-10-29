@@ -53,7 +53,8 @@ export async function getDashboard(periodDays = 30): Promise<Dashboard> {
      ), o as (
        select coalesce(source_post_id, $2) as post_id,
               count(*)::int as checkout_links,
-              count(*) filter (where link_clicks > 0)::int as links_clicked,
+              -- a confirmed order means the buyer used the link, even if the click wasn't recorded
+              count(*) filter (where link_clicks > 0 or status in ('confirmed', 'paid'))::int as links_clicked,
               count(*) filter (where status in ('confirmed', 'paid'))::int as confirmed,
               count(*) filter (where status = 'paid')::int as paid,
               coalesce(sum(total_naira) filter (where status = 'paid'), 0)::float8 as revenue_naira,

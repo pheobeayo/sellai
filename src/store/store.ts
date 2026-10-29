@@ -69,6 +69,7 @@ function toEnquiry(r: Row): EnquiryRecord {
     replyText: opt(r.reply_text),
     repliedAt: iso(r.replied_at),
     orderRef: opt(r.order_ref),
+    autoSent: r.auto_sent ?? false,
   };
 }
 
@@ -194,8 +195,26 @@ export const store = {
     ]);
   },
 
-  async markReplied(id: string, replyText: string): Promise<void> {
-    await (await db()).query(`update enquiries set reply_text=$2, replied_at=now(), status='replied' where id=$1`, [id, replyText]);
+  async markReplied(id: string, replyText: string, opts: { auto?: boolean } = {}): Promise<void> {
+    await (await db()).query(`update enquiries set reply_text=$2, replied_at=now(), status='replied', auto_sent=$3 where id=$1`, [id, replyText, opts.auto ?? false]);
+  },
+
+  /** Merge fields into a draft's metadata without touching the draft text. */
+  async patchDraftMeta(id: string, patch: Partial<DraftMeta>): Promise<void> {
+    await (await db()).query(`update enquiries set draft_meta = coalesce(draft_meta, '{}'::jsonb) || $2::jsonb where id=$1`, [id, JSON.stringify(patch)]);
+  },
+
+  // ── settings ──────────────────────────────────────────────────────────
+  async getSetting<T>(key: string, fallback: T): Promise<T> {
+    const { rows } = await (await db()).query(`select value from settings where key=$1`, [key]);
+    return rows[0] ? (rows[0].value as T) : fallback;
+  },
+
+  async setSetting(key: string, value: unknown): Promise<void> {
+    await (await db()).query(
+      `insert into settings (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [key, JSON.stringify(value)],
+    );
   },
 
   async setEnquiryStatus(id: string, status: EnquiryStatus): Promise<void> {

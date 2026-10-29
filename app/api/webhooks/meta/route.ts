@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     if (all.length === 0) return;
     const r = await ingest(all);
     console.log(
-      `[webhook] saved ${r.inserted.length} (dupes ${r.duplicates}) · triaged ${r.triaged} · drafted ${r.drafted.length} · orders confirmed ${r.confirmedOrders.join(", ") || "none"}` +
+      `[webhook] saved ${r.inserted.length} (dupes ${r.duplicates}) · triaged ${r.triaged} · drafted ${r.drafted.length} · auto-sent ${r.autoSent.length} · orders confirmed ${r.confirmedOrders.join(", ") || "none"}` +
         (r.errors.length ? ` · errors: ${r.errors.join("; ")}` : ""),
     );
   });

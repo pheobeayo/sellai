@@ -16,7 +16,8 @@
     "voice:demo": "SELLAI_DB=memory tsx scripts/transcribe-demo.ts",
     "catalogue:demo": "SELLAI_DB=memory tsx scripts/catalogue-demo.ts",
     "simulate:whatsapp": "tsx scripts/simulate-whatsapp.ts",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "agent:eval": "SELLAI_DB=memory tsx scripts/agent-eval.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.13",

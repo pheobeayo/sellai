@@ -1,3 +1,5 @@
+import type { CheckReport } from "@/agent/checks";
+
 export type Channel = "instagram_comment" | "facebook_comment" | "whatsapp" | "manual_import";
 
 export interface Variant {
@@ -76,6 +78,12 @@ export interface DraftMeta {
   usage: { prompt_tokens: number; completion_tokens: number };
   /** "agent" for Muse Spark drafts, "template" for deterministic order confirmations. */
   source: "agent" | "template";
+  /** How many earlier messages from this chat the agent was given (customer messages + sent replies). */
+  historyMessages?: number;
+  /** Independent checks run in code after the agent finished (see src/agent/checks.ts). */
+  checks?: CheckReport;
+  /** Why autopilot did or didn't send this draft by itself. */
+  autopilot?: { eligible: boolean; reason: string };
 }
 
 export interface EnquiryRecord extends Enquiry {
@@ -90,6 +98,8 @@ export interface EnquiryRecord extends Enquiry {
   replyText?: string;
   repliedAt?: string;
   orderRef?: string;
+  /** Sent by autopilot rather than approved by the vendor. */
+  autoSent?: boolean;
 }
 
 /**

@@ -58,7 +58,9 @@ flowchart TD
         TOOLS <--> CAT
         AG --> G{"Price check:<br/>every ₦ from a tool?"}
         G -- no --> AG
-        G -- yes --> DR[Draft reply]
+        G -- yes --> CHK{"8 independent checks<br/>stock · bank details · promises<br/>links · escalation · language"}
+        CHK --> DR[Draft reply]
+        DR -. "autopilot: low-risk + all checks pass" .-> AUTO[Sent automatically]
         DR --> AP["Vendor approves<br/>amounts re-checked, sent on WhatsApp"]
         AG -. complaint .-> ESC[Escalated to vendor]
     end
@@ -93,6 +95,25 @@ Instagram comments, Facebook comments and WhatsApp messages arrive through one w
 
 For each message that needs an answer, the **sales agent** (Muse Spark 1.3) looks up the real catalogue, stock and delivery fees with tool calls, and drafts a reply in the customer's own language. Before the vendor sees the draft, every ₦ amount is checked against tool results. An amount no tool returned triggers one self-correction and is flagged if it remains. Complaints and refunds always escalate to the vendor. Nothing is sent without the vendor's approval, and if the vendor edits the draft, every ₦ amount is checked again before it goes out. WhatsApp replies are sent through the WhatsApp Cloud API; comment replies are copied for the vendor to paste.
 
+### Checks and autopilot
+
+After the agent drafts a reply, **eight checks run in code**, outside the agent's control:
+
+| Check | Blocks sending? |
+|---|---|
+| Every ₦ amount came from a tool result | yes |
+| Enough stock for any order in the reply | yes |
+| No bank or account details (10-digit NUBAN, bank name + number) | yes |
+| No promises the agent has no tool for: reserve, hold, discount, free delivery, refund, guarantee | yes |
+| Every link is the real checkout link for this order | yes |
+| Complaints are escalated to the vendor | yes |
+| Reply matches the customer's language (Pidgin / English) | warns |
+| Short enough for chat | warns |
+
+The same checks run again when the vendor approves, so an edit can't slip in an invented price or an account number. The vendor can still send a held reply on purpose.
+
+**Autopilot** (a switch in the inbox, off by default) sends a reply without waiting only when all of these hold: it's a WhatsApp message; it's a price, delivery, stock or product question; triage is confident; the reply creates no order and isn't escalated; and every check passes, warnings included. Orders, complaints and anything flagged always wait for the vendor. Each draft says why autopilot sent it or held it.
+
 ### 4. Order and attribution
 
 When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the message and the post it came from, and puts a short link in the reply. When the buyer taps it, the click is recorded and WhatsApp opens with the order reference filled in. When they send that message, the order is confirmed automatically and a confirmation reply is drafted using the exact figures from the order. The vendor marks it paid, which deducts stock.
@@ -108,8 +129,8 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - [x] Auto-triage and auto-draft messages arriving through the webhook
 - [x] Send approved replies through the WhatsApp Cloud API
 - [x] Persistent database (Supabase Postgres, or local PGlite with no setup)
-- [ ] Independent verification checks and autopilot for low-risk replies
-- [ ] Agent scenario test suite with a published pass rate
+- [x] Independent verification checks and autopilot for low-risk replies
+- [x] Agent scenario test suite (24 scripted conversations)
 - [ ] Reply to Instagram and Facebook comments through the Graph API
 
 ### Key files
@@ -118,6 +139,9 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - `src/agent/sales-agent.ts` – tool-calling loop with parallel tool execution and a grounding self-repair step
 - `src/agent/tools.ts` – the only source of prices, stock and fees the agent may quote
 - `src/agent/grounding.ts` – extracts ₦ amounts (₦75,000 · N5000 · 98k · 103,000 naira) and checks each one came from a tool
+- `src/agent/checks.ts` – the eight independent reply checks
+- `src/inbox/autopilot.ts` – the policy for which replies may send themselves
+- `eval/agent-scenarios.ts`, `scripts/agent-eval.ts` – 24 scripted conversations scored against the real agent
 - `src/ai/transcribe.ts`, `src/ai/audio.ts` – voice note conversion and Muse Voice Transcribe with catalogue keywords
 - `src/ai/describe.ts`, `src/ai/segment.ts`, `src/ai/product-image.ts` – Muse Spark vision, SAM 3.1 and Muse Image steps
 - `src/catalogue/listing.ts` – the photo-to-listing pipeline and publishing
@@ -137,6 +161,8 @@ npm run ping                # confirms key + model work
 npm run selftest            # offline checks, no key needed
 npm run eval                # scores the classifier on the labelled set
 npm run agent:demo          # runs the agent on 4 realistic messages and prints tool traces
+npm run agent:eval          # 24 scripted conversations: pricing, stock, multi-turn, guardrails, escalation
+npm run agent:eval -- --save  # also writes eval/agent-results.json
 npm run voice:demo -- note.ogg        # voice note → transcript → intent → reply draft
 npm run catalogue:demo -- photo.jpg   # photo → description, SAM cut-out, studio shot → out/
 npm run dev                 # http://localhost:3000

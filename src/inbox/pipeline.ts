@@ -6,6 +6,9 @@ import type OpenAI from "openai";
 import type { DraftMeta, Enquiry, EnquiryRecord, Order } from "@/domain/types";
 import { parseAttribution } from "@/integrations/attribution";
 import { store } from "@/store/store";
+import { decideAutopilot, isAutopilotOn } from "./autopilot";
+import { approveAndSend } from "./send";
+import { checkReply } from "./verify";
 
 /**
  * Every incoming message takes the same path, whether it came from the Meta webhook,
@@ -32,12 +35,13 @@ export interface IngestResult {
   confirmedOrders: string[];
   triaged: number;
   drafted: string[];
+  autoSent: string[];
   errors: string[];
 }
 
 export async function ingest(items: Enquiry[], opts: IngestOptions = {}): Promise<IngestResult> {
   const { triage = true, autoDraft = true, maxDrafts = 5 } = opts;
-  const out: IngestResult = { inserted: [], duplicates: 0, confirmedOrders: [], triaged: 0, drafted: [], errors: [] };
+  const out: IngestResult = { inserted: [], duplicates: 0, confirmedOrders: [], triaged: 0, drafted: [], autoSent: [], errors: [] };
 
   const fresh: Enquiry[] = [];
   for (const e of items) {
@@ -89,8 +93,12 @@ export async function ingest(items: Enquiry[], opts: IngestOptions = {}): Promis
   const toDraft = results.filter((r) => !NO_REPLY_NEEDED.has(r.intent)).slice(0, maxDrafts); // already sorted by priority
   for (const r of toDraft) {
     try {
-      await draftReplyFor(r.id);
+      const rec = await draftReplyFor(r.id);
       out.drafted.push(r.id);
+      if (rec.draftMeta?.autopilot?.eligible && rec.draftReply) {
+        await approveAndSend(r.id, rec.draftReply, { auto: true });
+        out.autoSent.push(r.id);
+      }
     } catch (err) {
       out.errors.push(`draft ${r.id}: ${(err as Error).message}`);
     }
@@ -120,6 +128,8 @@ export async function draftReplyFor(id: string): Promise<EnquiryRecord> {
   // "yes I wan order one" on WhatsApp belongs to the post the conversation started from.
   const postId = e.postId ?? [...earlier].reverse().find((m) => m.postId)?.postId;
   if (postId && !e.postId) await store.setEnquiryPost(e.id, postId);
+  const history = buildHistory(earlier);
+  console.log(`[draft] ${e.id}: ${history.length} earlier message(s) from this chat`);
 
   const run = await runSalesAgent({
     message: e.text,
@@ -127,7 +137,7 @@ export async function draftReplyFor(id: string): Promise<EnquiryRecord> {
     postId,
     customerHandle: e.authorHandle,
     enquiryId: e.id,
-    history: buildHistory(earlier),
+    history,
   });
   const meta: DraftMeta = {
     steps: run.steps,
@@ -139,7 +149,10 @@ export async function draftReplyFor(id: string): Promise<EnquiryRecord> {
     model: run.model,
     usage: run.usage,
     source: "agent",
+    historyMessages: history.length,
   };
+  meta.checks = await checkReply(e, run.draftReply, meta);
+  meta.autopilot = decideAutopilot(e, meta, await isAutopilotOn());
   await store.saveDraft(id, run.draftReply, meta, run.escalated ? "escalated" : "drafted");
   return (await store.enquiry(id))!;
 }
@@ -162,7 +175,7 @@ async function confirmationDraft(e: Enquiry, order: Order): Promise<void> {
     priority: INTENT_PRIORITY.ready_to_buy + 10,
   });
   const g = checkGrounding(reply, amounts);
-  await store.saveDraft(e.id, reply, {
+  const meta: DraftMeta = {
     steps: [],
     groundedAmounts: amounts,
     grounding: { ok: g.ok, ungrounded: g.ungrounded },
@@ -172,5 +185,8 @@ async function confirmationDraft(e: Enquiry, order: Order): Promise<void> {
     model: "template",
     usage: { prompt_tokens: 0, completion_tokens: 0 },
     source: "template",
-  });
+  };
+  meta.checks = await checkReply({ intent: "ready_to_buy", language: "english" }, reply, meta);
+  meta.autopilot = { eligible: false, reason: "Order confirmations wait for you" };
+  await store.saveDraft(e.id, reply, meta);
 }

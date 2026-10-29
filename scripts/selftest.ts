@@ -191,4 +191,52 @@ assert.equal(hist[1].role, "assistant");
 assert.match(String(hist[1].content), /₦52,000/, "history carries what we actually sent");
 assert.equal((await store.conversationBefore({ id: "x", channel: "whatsapp", receivedAt: at(3) })).length, 0, "no handle, no history");
 
+// ── Independent reply checks ──────────────────────────────────────────────
+const { runChecks } = await import("@/agent/checks");
+const base = { groundedAmounts: [52000, 3500, 55500], orderRefs: ["SA-ABCD"], escalated: false, appUrl: "http://localhost:3000", customerLanguage: "pidgin", intent: "price_enquiry" };
+const ok = runChecks({ ...base, reply: "Body wave 18 inches na ₦52,000, Lekki delivery na ₦3,500. Order here: http://localhost:3000/o/SA-ABCD" });
+assert.ok(ok.clean, JSON.stringify(ok.checks.filter((c) => !c.ok)));
+const failIds = (reply: string, extra: object = {}) => runChecks({ ...base, ...extra, reply }).checks.filter((c) => !c.ok).map((c) => c.id);
+assert.deepEqual(failIds("E na ₦45,000 for you"), ["amounts_grounded"]);
+assert.deepEqual(failIds("Pay into 0123456789 abeg"), ["no_bank_details"]);
+assert.deepEqual(failIds("Send am to GTBank 012 345 6789 na"), ["no_bank_details"]);
+assert.deepEqual(failIds("No wahala, we go reserve am for you"), ["no_unsupported_promises"]);
+assert.deepEqual(failIds("I go keep am for you till Friday, e dey"), ["no_unsupported_promises"]);
+assert.deepEqual(failIds("We fit give you discount, e dey"), ["no_unsupported_promises"]);
+assert.deepEqual(failIds("Pay here na: https://paystack.com/pay/xyz"), ["links_valid"]);
+assert.deepEqual(failIds("Order here na: http://localhost:3000/o/SA-ZZZZ"), ["links_valid"]);
+assert.deepEqual(failIds("Sorry, we go check am", { intent: "complaint" }), ["complaint_escalated"]);
+assert.deepEqual(failIds("Sorry, we go check am", { intent: "complaint", escalated: true }), []);
+assert.deepEqual(failIds("The price is ₦52,000 and delivery is ₦3,500."), ["language_match"], "Pidgin customer, English reply: warning");
+assert.ok(runChecks({ ...base, reply: "The price is ₦52,000 and delivery is ₦3,500." }).passed, "a warning doesn't block");
+assert.deepEqual(failIds("Body wave 18 na ₦52,000", { orderStock: [{ ref: "SA-ABCD", quantity: 5, stock: 2 }] }), ["stock_available"]);
+assert.deepEqual(failIds("Call us on 08031234567, e dey"), [], "an 11-digit phone number is not an account number");
+
+// ── Autopilot policy ──────────────────────────────────────────────────────
+const { decideAutopilot, isAutopilotOn, setAutopilot } = await import("@/inbox/autopilot");
+const waE = { channel: "whatsapp" as const, authorHandle: "234801", intent: "price_enquiry", confidence: 0.95 };
+const cleanMeta = { orderRefs: [], escalated: false, checks: ok, source: "agent" as const };
+assert.equal(decideAutopilot(waE, cleanMeta, false).eligible, false, "off by default");
+assert.equal(decideAutopilot(waE, cleanMeta, true).eligible, true);
+assert.equal(decideAutopilot({ ...waE, intent: "ready_to_buy" }, cleanMeta, true).eligible, false);
+assert.equal(decideAutopilot({ ...waE, intent: "complaint" }, cleanMeta, true).eligible, false);
+assert.equal(decideAutopilot({ ...waE, channel: "instagram_comment" }, cleanMeta, true).eligible, false);
+assert.equal(decideAutopilot({ ...waE, confidence: 0.6 }, cleanMeta, true).eligible, false);
+assert.equal(decideAutopilot(waE, { ...cleanMeta, orderRefs: ["SA-ABCD"] }, true).eligible, false);
+assert.equal(decideAutopilot(waE, { ...cleanMeta, checks: runChecks({ ...base, reply: "E na ₦45,000" }) }, true).eligible, false);
+assert.equal(await isAutopilotOn(), false);
+await setAutopilot(true);
+assert.equal(await isAutopilotOn(), true);
+await setAutopilot(false);
+
+// Sending re-runs the checks: an edited-in account number is held, the vendor can override
+await store.addEnquiry({ id: "chk_1", channel: "whatsapp", text: "how I go pay?", authorHandle: "2348077770000", receivedAt: new Date().toISOString() });
+const { ReplyCheckError } = await import("@/inbox/send");
+await assert.rejects(approveAndSend("chk_1", "Pay into 0123456789"), ReplyCheckError);
+assert.equal((await approveAndSend("chk_1", "Pay into 0123456789", { force: true })).auto, false);
+
+// Funnel: a confirmed order counts as an opened link even if the click wasn't recorded
+const f = await getDashboard(30);
+assert.ok(f.totals.linksClicked >= f.totals.confirmed, "funnel never widens");
+
 console.log("selftest: all checks passed");

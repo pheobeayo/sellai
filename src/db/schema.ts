@@ -81,4 +81,13 @@ create table if not exists orders (
   is_demo boolean not null default false
 );
 create index if not exists orders_post_idx on orders(source_post_id);
+
+-- Columns added after the first release (safe to run on existing databases).
+alter table enquiries add column if not exists auto_sent boolean not null default false;
+
+create table if not exists settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
 `;
