@@ -239,4 +239,14 @@ assert.equal((await approveAndSend("chk_1", "Pay into 0123456789", { force: true
 const f = await getDashboard(30);
 assert.ok(f.totals.linksClicked >= f.totals.confirmed, "funnel never widens");
 
+// Listing drafts are tidied when the model ignores the format rules
+const { tidyDraft } = await import("@/ai/describe");
+const td = tidyDraft({ name: "Curly Bob Wig", category: "wigs", segment_phrase: "for women wanting a short curly bob look", colour: "black", style: "curly bob",
+  tags: ["bob", "curly"], description: "x", confirm_with_vendor: ["price", "stock availability", "hair origin"], suggested_variant_labels: ["As pictured - Black short curly bob", "Other colour / length - confirm", "12 inches"], caption: "x" });
+assert.equal(td.segment_phrase, "wig");
+assert.deepEqual(td.suggested_variant_labels, ["12 inches"]);
+assert.deepEqual(td.confirm_with_vendor, ["hair origin"]);
+assert.deepEqual(tidyDraft({ ...td, suggested_variant_labels: ["Other - confirm"] }).suggested_variant_labels, ["Standard"]);
+assert.equal(tidyDraft({ ...td, segment_phrase: "handbag" }).segment_phrase, "handbag");
+
 console.log("selftest: all checks passed");
