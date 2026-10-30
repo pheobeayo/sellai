@@ -1,4 +1,4 @@
-const GRAPH = "https://graph.facebook.com/v21.0"; // check the current Graph API version in your app dashboard
+const GRAPH = `https://graph.facebook.com/${process.env.META_GRAPH_VERSION || "v25.0"}`; // matches the version shown in your app dashboard
 
 function waToken(): string {
   const t = process.env.WHATSAPP_ACCESS_TOKEN;
