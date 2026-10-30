@@ -196,7 +196,7 @@ export default function DashboardPage() {
                       <td>{o.item}{o.city ? <div className="gloss">{o.city}</div> : null}</td>
                       <td><div className="cap">{o.sourcePostCaption ?? "–"}</div></td>
                       <td className="n">{naira(o.totalNaira)}</td>
-                      <td className="n">{o.linkClicks ? `opened ×${o.linkClicks}` : "not yet"}</td>
+                      <td className="n">{o.linkClicks ? `opened ×${o.linkClicks}` : o.status === "confirmed" || o.status === "paid" ? "used" : "not yet"}</td>
                       <td><span className={`status ${o.status}`}>{o.status}</span></td>
                       <td className="actions">
                         {(o.status === "draft" || o.status === "confirmed") && (

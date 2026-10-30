@@ -31,6 +31,8 @@ Rules:
 - Compare posts (e.g. which converts buying signals into paid orders best) and point to where buyers drop off.
 - Each insight ends with one concrete, cheap action (what to post or change next).
 - If the data is too thin to compare, say so plainly instead of guessing.
+- Write for a busy vendor in plain English. Refer to posts by their caption in quotes, never by id.
+  Never write field names (no underscores, no camelCase). Write money as ₦ with commas, e.g. ₦55,500.
 Return ONLY JSON: {"insights":[{"title","finding","action","post_ids"}]}`;
 
 export const MIN_ORDERS_FOR_CONFIDENCE = 5;
@@ -43,20 +45,28 @@ export interface InsightsResult {
 }
 
 export async function generateInsights(dash: Dashboard): Promise<InsightsResult> {
+  const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
   const posts = dash.posts.map((p) => ({
     post_id: p.postId,
-    caption: p.caption,
-    enquiries: p.enquiries,
-    buying_signals: p.buyingSignals,
-    ready_to_buy: p.readyToBuy,
-    checkout_links_sent: p.checkoutLinks,
-    links_clicked: p.linksClicked,
-    orders_confirmed: p.confirmed,
-    orders_paid: p.paid,
-    revenue_naira: p.revenueNaira,
-    avg_reply_minutes: p.avgReplyMinutes,
+    post: p.caption,
+    "messages": p.enquiries,
+    "buying signals": p.buyingSignals,
+    "ready to buy": p.readyToBuy,
+    "checkout links sent": p.checkoutLinks,
+    "links opened": p.linksClicked,
+    "orders confirmed": p.confirmed,
+    "orders paid": p.paid,
+    "revenue": naira(p.revenueNaira),
+    "average reply time (minutes)": p.avgReplyMinutes,
   }));
-  const data = { period_days: dash.periodDays, totals: dash.totals, posts };
+  const t = dash.totals;
+  const totals = {
+    "messages": t.enquiries, "buying signals": t.buyingSignals, "ready to buy": t.readyToBuy,
+    "checkout links sent": t.checkoutLinks, "links opened": t.linksClicked, "orders confirmed": t.confirmed,
+    "orders paid": t.paid, "revenue": naira(t.revenueNaira), "confirmed but unpaid": naira(t.pipelineNaira),
+    "average reply time (minutes)": t.avgReplyMinutes,
+  };
+  const data = { "period (days)": dash.periodDays, totals, posts };
 
   const { data: out } = await completeJSON({
     client: meta(),
