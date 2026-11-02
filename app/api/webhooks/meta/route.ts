@@ -37,6 +37,7 @@ export async function POST(req: Request) {
     return new Response("Invalid JSON", { status: 400 });
   }
   const { enquiries, voiceNotes } = normalizeWebhook(payload as never);
+  logDeliveryFailures(payload);
 
   after(async () => {
     const all: Enquiry[] = [...enquiries];
@@ -60,4 +61,23 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ received: enquiries.length + voiceNotes.length });
+}
+
+/**
+ * WhatsApp accepts a send, then reports delivery later as a "statuses" webhook. Log failures with Meta's reason,
+ * so an approved reply that never reached the phone shows up in the server logs.
+ */
+function logDeliveryFailures(payload: unknown) {
+  type Status = { id?: string; status?: string; recipient_id?: string; errors?: Array<{ code?: number; title?: string; message?: string; error_data?: { details?: string } }> };
+  const entries = (payload as { entry?: Array<{ changes?: Array<{ value?: { statuses?: Status[] } }> }> })?.entry ?? [];
+  for (const e of entries)
+    for (const c of e.changes ?? [])
+      for (const s of c.value?.statuses ?? []) {
+        if (s.status === "failed") {
+          const err = s.errors?.[0];
+          console.error(`[whatsapp] delivery FAILED to ${s.recipient_id}: ${err?.code ?? "?"} ${err?.title ?? ""} ${err?.error_data?.details ?? err?.message ?? ""}`.trim());
+        } else if (s.status) {
+          console.log(`[whatsapp] ${s.status} → ${s.recipient_id}`);
+        }
+      }
 }
