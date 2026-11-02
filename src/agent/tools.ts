@@ -2,6 +2,8 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import type { Channel, Order } from "@/domain/types";
 import { checkoutShortLink, newOrderRef } from "@/integrations/attribution";
+import { activeRewards } from "@/loyalty/customers";
+import { describeReward, rewardDiscount } from "@/loyalty/rules";
 import { store } from "@/store/store";
 
 /**
@@ -68,7 +70,7 @@ export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
     function: {
       name: "create_order_draft",
       description:
-        "Create a DRAFT order when the customer has clearly chosen a product and variant. The vendor must confirm it. Returns an order ref and a WhatsApp checkout link to send the customer.",
+        "Create a DRAFT order when the customer has clearly chosen a product and variant. The vendor must confirm it. Returns an order ref and a WhatsApp checkout link to send the customer. If the customer has an unused loyalty reward it is applied automatically and returned as loyalty_reward.",
       parameters: {
         type: "object",
         properties: {
@@ -169,6 +171,10 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       if (v.stock < a.data.quantity) return { ok: false, error: `Only ${v.stock} left of ${v.label}. Offer another variant.` };
       const zone = a.data.city ? findZone(a.data.city) : undefined;
       const deliveryFee = zone?.feeNaira ?? 0;
+      const subtotal = v.priceNaira * a.data.quantity;
+      // Loyal customers: an unused reward is applied in code, so the agent never decides a discount itself.
+      const reward = ctx.customerHandle ? (await activeRewards(ctx.customerHandle))[0] : undefined;
+      const discount = reward ? rewardDiscount(reward, subtotal, deliveryFee) : 0;
       const order: Order = {
         ref: newOrderRef(),
         productId: p.id,
@@ -176,7 +182,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         quantity: a.data.quantity,
         unitPriceNaira: v.priceNaira,
         deliveryFeeNaira: deliveryFee,
-        totalNaira: v.priceNaira * a.data.quantity + deliveryFee,
+        totalNaira: subtotal + deliveryFee - discount,
+        discountNaira: discount,
+        rewardCode: reward?.code,
         city: zone?.city ?? a.data.city,
         customerHandle: ctx.customerHandle,
         channel: ctx.channel,
@@ -197,11 +205,21 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           item: `${p.name} (${v.label}) x${order.quantity}`,
           subtotal: naira(v.priceNaira * order.quantity),
           delivery_fee: zone ? naira(deliveryFee) : "to be confirmed (city unknown)",
+          ...(reward
+            ? {
+                loyalty_reward: {
+                  code: reward.code,
+                  reward: describeReward(reward, await store.products()),
+                  discount: discount ? naira(discount) : undefined,
+                  note: "Thank them for being a loyal customer and mention this reward.",
+                },
+              }
+            : {}),
           total: naira(order.totalNaira),
           checkout_link: link,
           payment_note: store.vendor().paymentNote,
         },
-        groundedAmounts: [v.priceNaira, v.priceNaira * order.quantity, deliveryFee, order.totalNaira],
+        groundedAmounts: [v.priceNaira, subtotal, deliveryFee, order.totalNaira, ...(discount ? [discount, subtotal - discount] : [])],
       };
     }
 

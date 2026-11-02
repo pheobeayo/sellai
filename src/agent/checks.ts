@@ -45,6 +45,8 @@ export interface CheckContext {
   customerLanguage?: string;
   /** Public base URL; checkout links must be `${appUrl}/o/<ref>`. */
   appUrl: string;
+  /** A loyalty reward was applied by a tool, so mentioning the discount or free delivery is true. */
+  rewardApplied?: boolean;
 }
 
 // 10-digit NUBAN account numbers, or account/bank wording next to a long number.
@@ -53,12 +55,12 @@ const BANK_WORDS = /\b(acct|account\s*(no|number|num|details)?|a\/c|bank|opay|pa
 const LONG_NUMBER = /\d[\d\s-]{8,}\d/;
 
 // Things the agent has no tool for, in English and Pidgin.
-const PROMISES: Array<[RegExp, string, { exceptWhenEscalated?: boolean }?]> = [
+const PROMISES: Array<[RegExp, string, { exceptWhenEscalated?: boolean; exceptWhenRewarded?: boolean }?]> = [
   [/\breserv(e|ed|ing)\b/i, "reserve"],
   [/\b(hold|keep)\s+(it|am|one|dem)\b(\s+for\s+you)?/i, "hold/keep it"],
   [/\bset\s+(it\s+)?aside\b/i, "set aside"],
-  [/\bdiscount|\breduce\s+(am|it|the\s+price)|\bprice\s+(cut|slash)|%\s*off\b/i, "discount"],
-  [/\bfree\s+delivery\b/i, "free delivery"],
+  [/\bdiscount|\breduce\s+(am|it|the\s+price)|\bprice\s+(cut|slash)|%\s*off\b/i, "discount", { exceptWhenRewarded: true }],
+  [/\bfree\s+delivery\b/i, "free delivery", { exceptWhenRewarded: true }],
   [/\brefund(ed|s)?\b/i, "refund", { exceptWhenEscalated: true }], // "we'll look into your refund" is fine when the vendor takes over
   [/\bguarantee[ds]?\b/i, "guarantee"],
 ];
@@ -99,7 +101,9 @@ export function runChecks(ctx: CheckContext): CheckReport {
     detail: hasAccount ? "Looks like an account number. Send payment details yourself." : undefined,
   });
 
-  const promised = PROMISES.filter(([re, , o]) => re.test(r) && !(o?.exceptWhenEscalated && ctx.escalated)).map(([, name]) => name);
+  const promised = PROMISES.filter(
+    ([re, , o]) => re.test(r) && !(o?.exceptWhenEscalated && ctx.escalated) && !(o?.exceptWhenRewarded && ctx.rewardApplied),
+  ).map(([, name]) => name);
   checks.push({
     id: "no_unsupported_promises",
     label: "No promises the agent can't keep",

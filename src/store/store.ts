@@ -44,6 +44,10 @@ function toOrder(r: Row): Order {
     confirmedAt: iso(r.confirmed_at),
     paidAt: iso(r.paid_at),
     isDemo: r.is_demo,
+    discountNaira: r.discount_naira ?? 0,
+    rewardCode: opt(r.reward_code),
+    customerName: opt(r.customer_name),
+    originHandle: opt(r.origin_handle),
   };
 }
 
@@ -238,11 +242,12 @@ export const store = {
   async addOrder(o: Order): Promise<void> {
     await (await db()).query(
       `insert into orders (ref, product_id, variant_id, quantity, unit_price_naira, delivery_fee_naira, total_naira, city,
-         customer_handle, channel, source_post_id, source_enquiry_id, status, created_at, is_demo)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+         customer_handle, channel, source_post_id, source_enquiry_id, status, created_at, is_demo, discount_naira, reward_code, customer_name)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       [
         o.ref, o.productId, o.variantId, o.quantity, o.unitPriceNaira, o.deliveryFeeNaira, o.totalNaira, o.city ?? null,
         o.customerHandle ?? null, o.channel, o.sourcePostId ?? null, o.sourceEnquiryId ?? null, o.status, o.createdAt, o.isDemo ?? false,
+        o.discountNaira ?? 0, o.rewardCode ?? null, o.customerName ?? null,
       ],
     );
   },
@@ -266,12 +271,18 @@ export const store = {
     return rows[0] ? toOrder(rows[0]) : undefined;
   },
 
-  /** The buyer messaged the order ref on WhatsApp. Only moves draft → confirmed. */
-  async confirmOrder(ref: string, customerHandle?: string): Promise<Order | undefined> {
+  /**
+   * The buyer messaged the order ref on WhatsApp. Only moves draft → confirmed.
+   * From here the customer is known by their WhatsApp number; the original social handle
+   * (e.g. the Facebook name that commented) is kept in origin_handle.
+   */
+  async confirmOrder(ref: string, customerHandle?: string, customerName?: string): Promise<Order | undefined> {
     const { rows } = await (await db()).query(
-      `update orders set status='confirmed', confirmed_at=coalesce(confirmed_at, now()), customer_handle=coalesce($2, customer_handle)
+      `update orders set status='confirmed', confirmed_at=coalesce(confirmed_at, now()),
+         origin_handle=coalesce(origin_handle, case when $2::text is not null and customer_handle is distinct from $2::text then customer_handle end),
+         customer_handle=coalesce($2, customer_handle), customer_name=coalesce($3, customer_name)
        where ref=$1 and status='draft' returning *`,
-      [ref, customerHandle ?? null],
+      [ref, customerHandle ?? null, customerName ?? null],
     );
     return rows[0] ? toOrder(rows[0]) : undefined;
   },
@@ -293,6 +304,14 @@ export const store = {
     }
 
     const { rows } = await d.query(`update orders set status='paid', paid_at=now(), confirmed_at=coalesce(confirmed_at, now()) where ref=$1 returning *`, [ref]);
+    if (current.rewardCode) {
+      // A paid order uses up its loyalty reward; a gift leaves stock too.
+      const { rows: rw } = await d.query(
+        `update rewards set status='redeemed', redeemed_order_ref=$2 where code=$1 and status='issued' returning gift_variant_id, kind`,
+        [current.rewardCode, ref],
+      );
+      if (rw[0]?.kind === "gift" && rw[0].gift_variant_id) await d.query(`update variants set stock = greatest(stock - 1, 0) where id = $1`, [rw[0].gift_variant_id]);
+    }
     const { rows: before } = await d.query<{ stock: number }>(`select stock from variants where id = $1`, [current.variantId]);
     await d.query(`update variants set stock = greatest(stock - $2, 0) where id = $1`, [current.variantId, current.quantity]);
     const had = before[0]?.stock;

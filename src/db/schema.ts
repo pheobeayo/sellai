@@ -84,6 +84,29 @@ create index if not exists orders_post_idx on orders(source_post_id);
 
 -- Columns added after the first release (safe to run on existing databases).
 alter table enquiries add column if not exists auto_sent boolean not null default false;
+alter table orders add column if not exists discount_naira integer not null default 0;
+alter table orders add column if not exists reward_code text;
+alter table orders add column if not exists customer_name text;
+alter table orders add column if not exists origin_handle text;
+create index if not exists orders_customer_idx on orders(customer_handle);
+
+-- Loyalty rewards a vendor gives a customer. Applied automatically by the sales agent on the customer's next order.
+create table if not exists rewards (
+  code text primary key,
+  customer_handle text not null,
+  customer_name text,
+  kind text not null check (kind in ('percent_off','amount_off','free_delivery','gift')),
+  value integer not null default 0,
+  gift_variant_id text,
+  reason text,
+  message text,
+  status text not null default 'issued' check (status in ('issued','redeemed','cancelled')),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  redeemed_order_ref text,
+  sent_via text
+);
+create index if not exists rewards_customer_idx on rewards(customer_handle);
 
 create table if not exists settings (
   key text primary key,

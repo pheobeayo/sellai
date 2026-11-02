@@ -10,8 +10,10 @@ export async function checkReply(
   meta: Pick<DraftMeta, "groundedAmounts" | "orderRefs" | "escalated">,
 ): Promise<CheckReport> {
   const orderStock = [];
+  let rewardApplied = false;
   for (const ref of meta.orderRefs) {
     const o = await store.order(ref);
+    if (o?.rewardCode) rewardApplied = true;
     if (!o || o.status === "paid" || o.status === "cancelled") continue; // paid orders already deducted stock
     const p = await store.product(o.productId);
     const stock = p?.variants.find((v) => v.id === o.variantId)?.stock ?? 0;
@@ -26,5 +28,6 @@ export async function checkReply(
     escalated: meta.escalated,
     customerLanguage: e.language,
     appUrl: appUrl(),
+    rewardApplied,
   });
 }

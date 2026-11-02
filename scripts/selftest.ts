@@ -257,4 +257,125 @@ assert.equal(asKeywords("Extraordinarily Glamorous Burgundy Body Wave Frontal Wi
 assert.deepEqual(asKeywords(" "), []);
 assert.ok((await catalogueKeywords()).every((k) => k.length >= 2 && k.length <= 30));
 
+// ── Loyalty ───────────────────────────────────────────────────────────────
+const L = await import("@/loyalty/rules");
+assert.equal(L.tierFor(0, 0), "unpaid");
+assert.equal(L.tierFor(1, 80_000), "new");
+assert.equal(L.tierFor(2, 160_000), "returning");
+assert.equal(L.tierFor(3, 150_000), "loyal");
+assert.equal(L.tierFor(1, 250_000), "loyal", "big spenders count as loyal");
+assert.equal(L.tierFor(5, 100_000), "vip");
+assert.equal(L.isLapsing("loyal", new Date(Date.now() - 50 * 86_400_000).toISOString()), true);
+assert.equal(L.isLapsing("new", new Date(Date.now() - 90 * 86_400_000).toISOString()), false);
+
+const prods = await store.products();
+const vip = { tier: "vip" as const, avgOrderNaira: 80_000, spentNaira: 400_000 };
+assert.deepEqual(L.checkReward({ kind: "percent_off", value: 25 }, vip, prods).proposal, { kind: "percent_off", value: 10 }, "percent capped");
+assert.deepEqual(L.checkReward({ kind: "amount_off", value: 50_000 }, vip, prods).proposal, { kind: "amount_off", value: 8_000 }, "amount capped at 10% of avg order");
+assert.equal(L.checkReward({ kind: "gift", value: 0, giftVariantId: "v_bs_24" }, { ...vip, spentNaira: 100_000 }, prods).proposal.kind, "free_delivery", "too-expensive gift falls back");
+assert.equal(L.checkReward({ kind: "gift", value: 0, giftVariantId: "v_bs_24" }, { ...vip, spentNaira: 600_000 }, prods).proposal.kind, "gift");
+assert.equal(L.checkReward({ kind: "free_delivery", value: 0 }, { ...vip, tier: "unpaid" }, prods).ok, false, "no rewards before a paid order");
+assert.equal(L.rewardDiscount({ kind: "percent_off", value: 10 }, 75_000, 3_500), 7_500);
+assert.equal(L.rewardDiscount({ kind: "amount_off", value: 5_000 }, 3_000, 3_500), 3_000, "never more than the subtotal");
+assert.equal(L.rewardDiscount({ kind: "free_delivery", value: 0 }, 75_000, 3_500), 3_500);
+
+// The promise check blocks "discount" unless a tool actually applied a reward.
+const { runChecks: runChecksL } = await import("@/agent/checks");
+const promise = (rewardApplied: boolean) =>
+  runChecksL({ reply: "You get 10% discount as a loyal customer!", groundedAmounts: [], orderRefs: [], escalated: false, appUrl: "http://localhost:3000", rewardApplied })
+    .checks.find((c) => c.id === "no_unsupported_promises")!.ok;
+assert.equal(promise(false), false);
+assert.equal(promise(true), true);
+
+// End to end: three paid orders make a loyal customer; a reward is applied on the next order and used up when paid.
+const { getCustomers } = await import("@/loyalty/customers");
+const { issueReward, applyRewardToOrder, RewardError } = await import("@/loyalty/rewards");
+const loyalNo = "2348099990001";
+for (const [k, daysAgo] of [40, 20, 5].entries()) {
+  await store.addOrder({
+    ref: `SA-LY${k}`, productId: "p_body_wave", variantId: "v_bw_18", quantity: 1, unitPriceNaira: 52_000, deliveryFeeNaira: 3_500, totalNaira: 55_500,
+    city: "Lagos", customerHandle: loyalNo, customerName: "Ada Okafor", channel: k === 0 ? "facebook_comment" : "whatsapp", status: "paid",
+    createdAt: new Date(Date.now() - daysAgo * 86_400_000).toISOString(), linkClicks: 1,
+  });
+}
+const ada = (await getCustomers()).find((c) => c.handle === loyalNo)!;
+assert.equal(ada.tier, "loyal");
+assert.equal(ada.spentNaira, 166_500);
+assert.deepEqual(ada.sources.sort(), ["facebook", "whatsapp"]);
+assert.equal((await getCustomers({ source: "facebook" })).some((c) => c.handle === loyalNo), true, "filter by where they bought");
+
+await assert.rejects(
+  issueReward({ handle: loyalNo, proposal: { kind: "percent_off", value: 10 }, message: "Ada, you have spent ₦999,999 with us!", send: false }),
+  RewardError,
+  "invented amounts in the thank-you are blocked",
+);
+const issued = await issueReward({ handle: loyalNo, proposal: { kind: "percent_off", value: 10 }, message: "Ada, thank you for always choosing us!", send: false });
+assert.match(issued.fullMessage, /10% off your next order/);
+assert.match(issued.fullMessage, new RegExp(issued.reward.code));
+assert.equal(issued.delivered, false);
+assert.match(issued.waLink ?? "", /^https:\/\/wa\.me\/2348099990001\?text=/);
+await assert.rejects(issueReward({ handle: loyalNo, proposal: { kind: "free_delivery", value: 0 }, message: "Thanks!", send: false }), RewardError, "one unused reward at a time");
+
+const loyalOrder = await runTool("create_order_draft", JSON.stringify({ product_id: "p_bone_straight", variant_id: "v_bs_20", city: "Lagos" }), { channel: "whatsapp", customerHandle: loyalNo });
+assert.ok(loyalOrder.ok);
+const lo = loyalOrder.data as { order_ref: string; total: string; loyalty_reward?: { code: string; discount?: string } };
+assert.equal(lo.loyalty_reward?.code, issued.reward.code);
+assert.equal(lo.loyalty_reward?.discount, "₦7,500");
+assert.match(lo.total, /71,000/, "75,000 + 3,500 − 7,500");
+assert.ok(loyalOrder.groundedAmounts?.includes(7_500) && loyalOrder.groundedAmounts?.includes(71_000));
+const stranger = await runTool("create_order_draft", JSON.stringify({ product_id: "p_bone_straight", variant_id: "v_bs_20", city: "Lagos" }), { channel: "whatsapp", customerHandle: "2348099990002" });
+assert.equal((stranger.data as { loyalty_reward?: unknown }).loyalty_reward, undefined, "no reward for other customers");
+
+await store.setOrderStatus(lo.order_ref, "paid");
+const { rewardByCode } = await import("@/loyalty/rewards");
+const used = await rewardByCode(issued.reward.code);
+assert.equal(used?.status, "redeemed");
+assert.equal(used?.redeemedOrderRef, lo.order_ref);
+assert.equal((await getCustomers()).find((c) => c.handle === loyalNo)!.activeReward, undefined);
+
+// A Facebook commenter who confirms on WhatsApp: their number becomes the customer, the Facebook name is kept,
+// and an unused reward for that number applies at confirmation.
+const bimboNo = "2348099990003";
+for (const k of [0, 1]) {
+  await store.addOrder({
+    ref: `SA-BB${k}`, productId: "p_body_wave", variantId: "v_bw_18", quantity: 1, unitPriceNaira: 52_000, deliveryFeeNaira: 3_500, totalNaira: 55_500,
+    customerHandle: bimboNo, channel: "whatsapp", status: "paid", createdAt: new Date(Date.now() - (k + 2) * 86_400_000).toISOString(), linkClicks: 1,
+  });
+}
+await issueReward({ handle: bimboNo, proposal: { kind: "free_delivery", value: 0 }, message: "Thank you Bimbo!", send: false });
+await store.addOrder({
+  ref: "SA-FBC1", productId: "p_body_wave", variantId: "v_bw_18", quantity: 1, unitPriceNaira: 52_000, deliveryFeeNaira: 3_500, totalNaira: 55_500,
+  customerHandle: "Bimbo Facebook", channel: "facebook_comment", status: "draft", createdAt: new Date().toISOString(), linkClicks: 0,
+});
+const fbConf = await store.confirmOrder("SA-FBC1", bimboNo, "Bimbo");
+assert.equal(fbConf?.originHandle, "Bimbo Facebook");
+assert.equal(fbConf?.customerHandle, bimboNo);
+const applied = await applyRewardToOrder(fbConf!);
+assert.equal(applied.order.discountNaira, 3_500, "free delivery at confirmation");
+assert.equal(applied.order.totalNaira, 52_000);
+assert.equal((await store.order("SA-FBC1"))?.totalNaira, 52_000);
+
+// Reward suggestions: whatever the model proposes, the rules and checks in code have the last word.
+process.env.MODEL_API_KEY ||= "offline-test"; // the client is created but the fake below answers instead
+const { suggestRewards } = await import("@/loyalty/suggest");
+const fake = (async () => ({
+  data: {
+    suggestions: [
+      { handle: bimboNo, kind: "percent_off", value: 30, gift_variant_id: null, reason: "Two orders in a week", message: "Bimbo, thank you! You've spent ₦250,000 with us." },
+      { handle: "not-a-customer", kind: "free_delivery", value: 0, reason: "x", message: "x" },
+    ],
+  },
+  raw: "", attempts: 1,
+})) as unknown as Parameters<typeof suggestRewards>[1] extends infer D ? D extends { complete: infer C } ? C : never : never;
+await store.setOrderStatus("SA-FBC1", "cancelled"); // frees Bimbo's reward so we can test both paths
+const { cancelReward } = await import("@/loyalty/rewards");
+for (const r of (await getCustomers()).filter((c) => c.handle === bimboNo)) if (r.activeReward) await cancelReward(r.activeReward.code);
+const sug = await suggestRewards([bimboNo, loyalNo], { complete: fake });
+const sb = sug.suggestions.find((x) => x.customer.handle === bimboNo)!;
+assert.deepEqual(sb.proposal, { kind: "percent_off", value: 10 }, "model asked for 30%, rules cap at 10%");
+assert.match(sb.adjusted ?? "", /Capped/);
+assert.equal(sb.checks.passed, false, "₦250,000 isn't what Bimbo spent, so the message is held");
+assert.match(sb.preview, /10% off your next order/);
+assert.ok(sug.skipped.some((x) => x.handle === loyalNo), "no suggestion returned for Ada → reported as skipped");
+
 console.log("selftest: all checks passed");

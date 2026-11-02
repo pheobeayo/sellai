@@ -20,13 +20,14 @@ export default function PrivacyPage() {
           <li>Messages and comments sent to the vendor, including voice notes (which are transcribed to text).</li>
           <li>The sender&apos;s name and WhatsApp number or social handle, as provided by Meta.</li>
           <li>Orders created in a conversation: item, delivery city, total and status.</li>
+          <li>A purchase history per customer (orders, amounts, where they first found the shop), used to thank and reward repeat customers.</li>
           <li>Product photos and details the vendor uploads.</li>
         </ul>
 
         <h2 style={{ fontSize: 17 }}>How we use it</h2>
         <ul>
           <li>To draft and send replies on the vendor&apos;s behalf, and only after the vendor approves them unless the vendor turns on autopilot for simple questions.</li>
-          <li>To show the vendor which posts lead to sales.</li>
+          <li>To show the vendor which posts lead to sales and which customers keep coming back, so the vendor can thank them with a reward.</li>
           <li>Message text is processed by Meta&apos;s AI models through the Meta Model API to classify messages and draft replies.</li>
         </ul>
         <p>We do not sell personal data, show ads, or share data with anyone except the service providers needed to run the app (Meta, Vercel for hosting, Supabase for the database).</p>

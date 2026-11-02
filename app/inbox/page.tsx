@@ -240,7 +240,7 @@ export default function Inbox() {
 
   return (
     <main>
-      <nav className="nav"><Link href="/">Home</Link><span>Inbox</span><Link href="/catalogue">Catalogue</Link><Link href="/dashboard">Dashboard</Link></nav>
+      <nav className="nav"><Link href="/">Home</Link><span>Inbox</span><Link href="/catalogue">Catalogue</Link><Link href="/dashboard">Dashboard</Link><Link href="/customers">Customers</Link></nav>
       <h1>SellAI</h1>
       <p className="sub">Comments, DMs and voice notes from every channel. Buyers first, replies drafted from your real catalogue.</p>
       {error && <p className="err">{error}</p>}

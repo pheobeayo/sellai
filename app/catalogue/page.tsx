@@ -88,7 +88,7 @@ export default function CataloguePage() {
 
   return (
     <main>
-      <nav className="nav"><Link href="/">Home</Link><Link href="/inbox">Inbox</Link><span>Catalogue</span><Link href="/dashboard">Dashboard</Link></nav>
+      <nav className="nav"><Link href="/">Home</Link><Link href="/inbox">Inbox</Link><span>Catalogue</span><Link href="/dashboard">Dashboard</Link><Link href="/customers">Customers</Link></nav>
       <h1>Photo to listing</h1>
       <p className="sub">Snap a product. SellAI names it, cuts it out, makes a clean catalogue shot, and drafts the listing. You set the price.</p>
       {error && <p className="err">{error}</p>}

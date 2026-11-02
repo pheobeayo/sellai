@@ -122,6 +122,16 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 
 `/dashboard` answers "which of my posts actually brings in money?". For each post it shows messages, buyers found, links opened, confirmed and paid orders, revenue, buyer-to-paid conversion and average reply time, plus the overall funnel. **Muse Spark insights** read only those aggregated numbers and suggest what to post next. Any insight quoting a ₦ amount that isn't in the data is dropped, and a small-sample warning is added in code when there are fewer than 5 orders.
 
+### 6. Loyal customers and rewards
+
+`/customers` turns order history into a customer list. A buyer who commented on a Facebook post, confirmed on WhatsApp and came back through Instagram is **one customer**, known by their WhatsApp number, with the Facebook name they were first seen as. Filter by where they bought (Facebook, Instagram, WhatsApp).
+
+- **Tiers, in code:** New (1 paid order) → Returning (2) → Loyal (3+ orders or ₦200,000+) → VIP (5+ or ₦400,000+). A loyal customer with no purchase in 45 days is flagged **going quiet**.
+- **Muse Spark suggests the reward** for each customer (percent off, amount off, free delivery, or a gift from stock that suits their favourite product) and writes a short thank-you in their language. **The rules decide what's allowed:** at most 10% off, cash discounts capped at 10% of their average order, gifts only from in-stock items worth at most 20% of what they've spent. Anything outside the limits is capped or changed, and the vendor sees what was adjusted.
+- **The AI never writes the money.** The reward line ("🎁 10% off your next order…") is fixed text generated from the reward itself, and the personal message goes through the same independent checks as sales replies: an invented ₦ amount, bank details or a stray link blocks it.
+- **Redeemed automatically.** When that customer next orders on WhatsApp, the sales agent's `create_order_draft` tool applies the reward and returns the discount, so the agent can mention it and the grounding check still holds. A buyer who started on Facebook gets it at confirmation, once their WhatsApp number is known. The reward is marked used when the order is paid.
+- **WhatsApp's 24-hour rule is respected:** within 24 hours of the customer's last message the thank-you goes out through the Cloud API; otherwise SellAI opens WhatsApp with the message filled in for the vendor to send from their own phone.
+
 ### Roadmap
 
 - [x] Attribution dashboard: revenue per post and the enquiry → click → order funnel
@@ -131,7 +141,9 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - [x] Persistent database (Supabase Postgres, or local PGlite with no setup)
 - [x] Independent verification checks and autopilot for low-risk replies
 - [x] Agent scenario test suite (24 scripted conversations)
+- [x] Loyal customers: tiers, AI-suggested rewards within vendor rules, automatic redemption on the next order
 - [ ] Reply to Instagram and Facebook comments through the Graph API
+- [ ] Approved WhatsApp templates for thank-you messages outside the 24-hour window
 
 ### Key files
 
@@ -148,6 +160,8 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - `src/inbox/pipeline.ts` – save, order-ref matching, triage and auto-draft for every incoming message
 - `src/inbox/send.ts` – vendor approval: re-checks amounts, sends on WhatsApp
 - `src/dashboard/metrics.ts`, `src/dashboard/insights.ts` – per-post attribution in SQL, grounded insights
+- `src/loyalty/rules.ts` – loyalty tiers, reward limits and discount maths (pure, fully tested)
+- `src/loyalty/customers.ts`, `src/loyalty/rewards.ts`, `src/loyalty/suggest.ts` – customer list from orders, issuing and redeeming rewards, Muse Spark reward suggestions
 - `src/db/` – schema and the Postgres / PGlite client
 - `src/integrations/` – Meta webhook normalisation and signature check, WhatsApp send/media, attribution links
 - `eval/comments.jsonl` – 60 labelled comments in English, Pidgin, Yoruba, Igbo and Hausa
@@ -198,4 +212,5 @@ The paste/CSV inbox works without any of this, so the demo never depends on a li
 - The agent never shares or invents bank details.
 - Complaints and refunds always escalate to a human.
 - Listings never get AI-generated prices or stock, and AI-enhanced images are labelled so the vendor checks them against the real item.
+- Loyalty rewards stay within limits set in code, and every ₦ figure in a thank-you message comes from the reward or the customer's real orders.
 - No scraping: only the vendor's own posts and messages through Meta's official APIs.

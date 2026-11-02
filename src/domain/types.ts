@@ -131,4 +131,32 @@ export interface Order {
   confirmedAt?: string;
   paidAt?: string;
   isDemo?: boolean;
+  /** Loyalty discount taken off this order (already subtracted from totalNaira). */
+  discountNaira?: number;
+  /** Loyalty reward applied to this order, if any. */
+  rewardCode?: string;
+  /** Buyer's display name, from the WhatsApp message that confirmed the order. */
+  customerName?: string;
+  /** Who started the sale on the original channel (e.g. a Facebook name) before WhatsApp confirmed it. */
+  originHandle?: string;
+}
+
+export type RewardKind = "percent_off" | "amount_off" | "free_delivery" | "gift";
+export type RewardStatus = "issued" | "redeemed" | "cancelled";
+
+export interface Reward {
+  code: string;
+  customerHandle: string;
+  customerName?: string;
+  kind: RewardKind;
+  /** percent for percent_off, ₦ for amount_off, 0 otherwise */
+  value: number;
+  giftVariantId?: string;
+  reason?: string;
+  message?: string;
+  status: RewardStatus;
+  createdAt: string;
+  expiresAt: string;
+  redeemedOrderRef?: string;
+  sentVia?: string;
 }

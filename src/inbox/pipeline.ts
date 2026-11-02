@@ -5,6 +5,8 @@ import { runSalesAgent } from "@/agent/sales-agent";
 import type OpenAI from "openai";
 import type { DraftMeta, Enquiry, EnquiryRecord, Order } from "@/domain/types";
 import { parseAttribution } from "@/integrations/attribution";
+import { applyRewardToOrder, rewardByCode } from "@/loyalty/rewards";
+import { describeReward } from "@/loyalty/rules";
 import { store } from "@/store/store";
 import { decideAutopilot, isAutopilotOn } from "./autopilot";
 import { approveAndSend } from "./send";
@@ -57,9 +59,12 @@ export async function ingest(items: Enquiry[], opts: IngestOptions = {}): Promis
     if (e.channel !== "whatsapp") continue;
     const { orderRef } = parseAttribution(e.text);
     if (!orderRef) continue;
-    const order = await store.confirmOrder(orderRef, e.authorHandle);
-    if (!order) continue; // unknown ref, or already confirmed: treat as a normal message
-    await confirmationDraft(e, order);
+    const confirmed = await store.confirmOrder(orderRef, e.authorHandle, e.authorName);
+    if (!confirmed) continue; // unknown ref, or already confirmed: treat as a normal message
+    // Now we know their WhatsApp number: a loyal customer's unused reward applies here.
+    const { order } = await applyRewardToOrder(confirmed);
+    const reward = order.rewardCode ? await rewardByCode(order.rewardCode) : undefined;
+    await confirmationDraft(e, order, reward ? describeReward(reward, await store.products()) : undefined);
     handled.add(e.id);
     out.confirmedOrders.push(order.ref);
   }
@@ -158,13 +163,20 @@ export async function draftReplyFor(id: string): Promise<EnquiryRecord> {
 }
 
 /** Deterministic reply for a confirmed order: every figure comes straight from the order row. */
-async function confirmationDraft(e: Enquiry, order: Order): Promise<void> {
+async function confirmationDraft(e: Enquiry, order: Order, rewardText?: string): Promise<void> {
   const product = await store.product(order.productId);
   const variant = product?.variants.find((v) => v.id === order.variantId);
   const item = `${product?.name ?? "your item"}${variant ? ` (${variant.label})` : ""} x${order.quantity}`;
   const delivery = order.deliveryFeeNaira ? ` including ${naira(order.deliveryFeeNaira)} delivery${order.city ? ` to ${order.city}` : ""}` : "";
-  const reply = `Thank you! We've received your order ${order.ref}: ${item}, total ${naira(order.totalNaira)}${delivery}. ${store.vendor().paymentNote}`;
-  const amounts = [order.unitPriceNaira, order.unitPriceNaira * order.quantity, order.deliveryFeeNaira, order.totalNaira];
+  const discount = order.discountNaira ?? 0;
+  const newReward = rewardText;
+  const loyalty = !newReward
+    ? ""
+    : discount
+      ? ` As a thank-you for being a loyal customer, ${naira(discount)} is off this order (${newReward.replace(/ (on|with) your next order$/, "")}).`
+      : ` As a thank-you for being a loyal customer, you get ${newReward.replace(/ (on|with) your next order$/, "")}.`;
+  const reply = `Thank you! We've received your order ${order.ref}: ${item}, total ${naira(order.totalNaira)}${delivery}.${loyalty} ${store.vendor().paymentNote}`;
+  const amounts = [order.unitPriceNaira, order.unitPriceNaira * order.quantity, order.deliveryFeeNaira, order.totalNaira, ...(discount ? [discount] : [])];
 
   await store.linkEnquiryToOrder(e.id, order.ref);
   await store.saveTriage(e.id, {
