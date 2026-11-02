@@ -33,6 +33,7 @@ Rules:
 - If the data is too thin to compare, say so plainly instead of guessing.
 - Write for a busy vendor in plain English. Refer to posts by their caption in quotes, never by id.
   Never write field names (no underscores, no camelCase). Write money as ₦ with commas, e.g. ₦55,500.
+  Use correct singular and plural: "1 order", "2 orders", "1 checkout link", "3 links".
 Return ONLY JSON: {"insights":[{"title","finding","action","post_ids"}]}`;
 
 export const MIN_ORDERS_FOR_CONFIDENCE = 5;

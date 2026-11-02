@@ -249,4 +249,12 @@ assert.deepEqual(td.confirm_with_vendor, ["hair origin"]);
 assert.deepEqual(tidyDraft({ ...td, suggested_variant_labels: ["Other - confirm"] }).suggested_variant_labels, ["Standard"]);
 assert.equal(tidyDraft({ ...td, segment_phrase: "handbag" }).segment_phrase, "handbag");
 
+// Speech keywords never exceed the ASR 30-character limit
+const { asKeywords, catalogueKeywords } = await import("@/ai/transcribe");
+assert.deepEqual(asKeywords("Long Black Loose Wave Wig with Middle Part"), ["Long Black Loose Wave Wig"]);
+assert.deepEqual(asKeywords("Bone straight"), ["Bone straight"]);
+assert.equal(asKeywords("Extraordinarily Glamorous Burgundy Body Wave Frontal Wig")[0].length <= 30, true);
+assert.deepEqual(asKeywords(" "), []);
+assert.ok((await catalogueKeywords()).every((k) => k.length >= 2 && k.length <= 30));
+
 console.log("selftest: all checks passed");

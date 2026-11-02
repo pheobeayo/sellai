@@ -22,12 +22,27 @@ export interface Transcript {
 export async function catalogueKeywords(limit = 60): Promise<string[]> {
   const words = new Set<string>();
   for (const p of await store.products()) {
-    words.add(p.name);
-    p.tags.forEach((t) => words.add(t));
-    p.variants.forEach((v) => words.add(v.label));
+    asKeywords(p.name).forEach((w) => words.add(w));
+    p.tags.forEach((t) => asKeywords(t).forEach((w) => words.add(w)));
+    p.variants.forEach((v) => asKeywords(v.label).forEach((w) => words.add(w)));
   }
-  for (const z of store.deliveryZones()) words.add(z.city);
-  return [...words].filter((w) => w.length > 1).slice(0, limit);
+  for (const z of store.deliveryZones()) asKeywords(z.city).forEach((w) => words.add(w));
+  return [...words].slice(0, limit);
+}
+
+/** The ASR API rejects any keyword over 30 characters, so long product names are shortened or dropped. */
+export const MAX_KEYWORD_CHARS = 30;
+export function asKeywords(phrase: string): string[] {
+  const p = phrase.trim().replace(/\s+/g, " ");
+  if (p.length < 2) return [];
+  if (p.length <= MAX_KEYWORD_CHARS) return [p];
+  // "Long Black Loose Wave Wig with Middle Part" → "Long Black Loose Wave Wig" → "Loose Wave Wig"
+  const head = p.split(/\s+(?:with|for|and|in|-|–|,)\s+/i)[0].trim();
+  if (head.length >= 2 && head.length <= MAX_KEYWORD_CHARS) return [head];
+  const words = head.split(" ");
+  while (words.length > 1 && words.join(" ").length > MAX_KEYWORD_CHARS) words.shift();
+  const tail = words.join(" ");
+  return tail.length >= 2 && tail.length <= MAX_KEYWORD_CHARS ? [tail] : [];
 }
 
 export async function transcribe(audio: Buffer): Promise<Transcript> {
