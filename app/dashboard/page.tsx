@@ -80,7 +80,7 @@ export default function DashboardPage() {
 
   return (
     <main>
-      <nav className="nav"><Link href="/">Inbox</Link><Link href="/catalogue">Catalogue</Link><span>Dashboard</span></nav>
+      <nav className="nav"><Link href="/">Home</Link><Link href="/inbox">Inbox</Link><Link href="/catalogue">Catalogue</Link><span>Dashboard</span></nav>
       <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
         <div>
           <h1>Which posts make money</h1>
