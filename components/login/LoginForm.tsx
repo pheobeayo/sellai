@@ -1,29 +1,29 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 
-type Step = "phone" | "code";
+type Step = "phone" | "waiting";
 
-async function sendWhatsAppCode(_phone: string) {}
-async function verifyWhatsAppCode(_phone: string, _code: string) {}
-function continueWithMeta(_provider: "facebook" | "instagram") {}
+interface Methods { configured: boolean; whatsapp: boolean; passcode: boolean }
 
-const Chevron = () => (
-  <svg
-    aria-hidden
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#5C635E"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="ml-auto"
-  >
-    <path d="m9 6 6 6-6 6" />
-  </svg>
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error?.message ?? "Something went wrong. Try again.");
+  return json as T;
+}
+
+/** Where to go after login: the page the seller was trying to open, if it's on this site. */
+function nextPath(): string {
+  const n = new URLSearchParams(window.location.search).get("next");
+  return n && n.startsWith("/") && !n.startsWith("//") ? n : "/inbox";
+}
+
+const SoonBadge = () => (
+  <span className="ml-auto rounded-full bg-[#F1ECE3] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.6px] text-[#5C635E]">
+    Soon
+  </span>
 );
 
 const fieldClass =
@@ -36,29 +36,74 @@ const metaClass =
 export default function LoginForm() {
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [challenge, setChallenge] = useState<{ code: string; waLink: string; expiresAt: string } | null>(null);
+  const [expired, setExpired] = useState(false);
+  const [methods, setMethods] = useState<Methods | null>(null);
+  const [showPasscode, setShowPasscode] = useState(false);
+  const [passcode, setPasscode] = useState("");
 
   const digits = phone.replace(/\D/g, "");
   const fullNumber = `+234${digits.replace(/^0/, "")}`;
 
-  async function onSendCode(e: FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((m: Methods & { signedIn: boolean }) => {
+        if (m.signedIn) window.location.replace(nextPath());
+        setMethods(m);
+      })
+      .catch(() => setMethods({ configured: true, whatsapp: true, passcode: false }));
+  }, []);
+
+  // While waiting, ask the server every 2 seconds whether the WhatsApp message has arrived.
+  useEffect(() => {
+    if (step !== "waiting" || !challenge) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/auth/status", { cache: "no-store" }).then((x) => x.json());
+        if (stop) return;
+        if (r.status === "verified") return window.location.replace(nextPath());
+        if (r.status === "expired") return setExpired(true);
+      } catch {
+        /* network blip: keep polling */
+      }
+      if (!stop) timer = setTimeout(tick, 2000);
+    };
+    let timer = setTimeout(tick, 2000);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [step, challenge]);
+
+  async function onSendCode(e?: FormEvent) {
+    e?.preventDefault();
     setBusy(true);
+    setError("");
+    setExpired(false);
     try {
-      await sendWhatsAppCode(fullNumber);
-      setStep("code");
+      const c = await post<{ code: string; waLink: string; expiresAt: string }>("/api/auth/start", { phone: fullNumber });
+      setChallenge(c);
+      setStep("waiting");
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function onVerify(e: FormEvent) {
+  async function onPasscode(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     try {
-      await verifyWhatsAppCode(fullNumber, code);
-    } finally {
+      await post("/api/auth/passcode", { passcode });
+      window.location.replace(nextPath());
+    } catch (err) {
+      setError((err as Error).message);
       setBusy(false);
     }
   }
@@ -70,9 +115,20 @@ export default function LoginForm() {
           Seller login
         </h2>
         <p className="m-0 text-[15px] text-[#5C635E]">
-          Choose where you sell most.
+          Sign in with the WhatsApp number your shop runs on.
         </p>
       </div>
+
+      {methods && !methods.configured && (
+        <p role="alert" className="m-0 rounded-2xl bg-[#FDF0E6] px-4 py-3 text-sm text-[#8A3B12]">
+          Login isn&apos;t set up on this server yet: add SESSION_SECRET to the environment.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="m-0 rounded-2xl bg-[#FDF0E6] px-4 py-3 text-sm font-medium text-[#8A3B12]">
+          {error}
+        </p>
+      )}
 
       {step === "phone" ? (
         <>
@@ -129,7 +185,7 @@ export default function LoginForm() {
               />
             </div>
             <button type="submit" disabled={busy} className={primaryClass}>
-              {busy ? "Sending…" : "Send me a code"}
+              {busy ? "Getting your code…" : "Get my login code"}
               <svg
                 aria-hidden
                 width="18"
@@ -154,8 +210,9 @@ export default function LoginForm() {
 
           <button
             type="button"
-            onClick={() => continueWithMeta("facebook")}
-            className={metaClass}
+            disabled
+            title="Coming soon"
+            className={`${metaClass} cursor-not-allowed opacity-60 hover:border-[#E3DACB]`}
           >
             <span className="flex size-8 items-center justify-center rounded-[9px] bg-[#EAF0FB]">
               <svg
@@ -174,12 +231,13 @@ export default function LoginForm() {
               </svg>
             </span>
             Continue with Facebook
-            <Chevron />
+            <SoonBadge />
           </button>
           <button
             type="button"
-            onClick={() => continueWithMeta("instagram")}
-            className={metaClass}
+            disabled
+            title="Coming soon"
+            className={`${metaClass} cursor-not-allowed opacity-60 hover:border-[#E3DACB]`}
           >
             <span className="flex size-8 items-center justify-center rounded-[9px] bg-[#FBEAF0]">
               <svg
@@ -199,91 +257,99 @@ export default function LoginForm() {
               </svg>
             </span>
             Continue with Instagram
-            <Chevron />
+            <SoonBadge />
           </button>
+
+          {methods?.passcode && (
+            showPasscode ? (
+              <form onSubmit={onPasscode} className="flex flex-col gap-3 rounded-[20px] border-2 border-[#E3DACB] bg-white p-[18px]">
+                <label htmlFor="passcode" className="text-[13px] font-bold text-[#5C635E]">Shop passcode</label>
+                <div className={fieldClass}>
+                  <input
+                    id="passcode"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    autoFocus
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    className="h-full min-w-0 flex-1 border-0 bg-transparent px-4 text-base font-medium text-[#15201B] outline-none"
+                  />
+                </div>
+                <button type="submit" disabled={busy || !passcode} className={primaryClass}>
+                  {busy ? "Checking…" : "Log in with passcode"}
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowPasscode(true)}
+                className="min-h-11 cursor-pointer self-start border-0 bg-transparent p-0 text-sm font-bold text-forest"
+              >
+                Have a shop passcode?
+              </button>
+            )
+          )}
         </>
       ) : (
-        <form
-          onSubmit={onVerify}
-          className="flex flex-col gap-3.5 rounded-[20px] border-2 border-forest bg-white p-5"
-        >
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 flex-none items-center justify-center rounded-[10px] bg-[#E2F3EA]">
-              <svg
-                aria-hidden
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#1F5A44"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+        <div className="flex flex-col gap-3.5 rounded-[20px] border-2 border-forest bg-white p-5">
+          <p className="m-0 text-[14.5px] leading-normal">
+            To prove it&apos;s you, send this code <strong>from {fullNumber}</strong> to our WhatsApp. It&apos;s valid for 10 minutes.
+          </p>
+          <div
+            aria-label="Your login code"
+            className="rounded-2xl bg-[#E2F3EA] py-4 text-center font-display text-[34px] font-bold tracking-[10px] text-forest"
+          >
+            {challenge?.code}
+          </div>
+          {!expired ? (
+            <>
+              <a
+                href={challenge?.waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${primaryClass} no-underline`}
               >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </span>
-            <p className="m-0 text-[14.5px] leading-normal">
-              We sent a 6-digit code to <strong>{fullNumber}</strong> on
-              WhatsApp.
-            </p>
-          </div>
-
-          <label
-            htmlFor="wa-code"
-            className="text-[13px] font-bold text-[#5C635E]"
-          >
-            Login code
-          </label>
-          <div className={fieldClass}>
-            <input
-              id="wa-code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              pattern="\d{6}"
-              required
-              autoFocus
-              placeholder="••••••"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="h-full min-w-0 flex-1 border-0 bg-transparent px-4 text-center text-[22px] font-bold tracking-[10px] text-[#15201B] outline-none"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy || code.length !== 6}
-            className={primaryClass}
-          >
-            {busy ? "Checking…" : "Log in to my sales desk"}
-          </button>
+                Send the code on WhatsApp
+              </a>
+              <p role="status" className="m-0 flex items-center justify-center gap-2 text-sm text-[#5C635E]">
+                <span aria-hidden className="size-2 animate-pulse rounded-full bg-forest" />
+                Waiting for your message… this page signs you in by itself.
+              </p>
+            </>
+          ) : (
+            <button type="button" onClick={() => onSendCode()} disabled={busy} className={primaryClass}>
+              {busy ? "Getting a new code…" : "Code expired. Get a new one"}
+            </button>
+          )}
           <div className="flex flex-wrap justify-between gap-3">
             <button
               type="button"
               onClick={() => {
-                setCode("");
+                setChallenge(null);
                 setStep("phone");
               }}
               className="min-h-11 cursor-pointer border-0 bg-transparent p-0 text-sm font-bold text-forest"
             >
               Change number
             </button>
-            <button
-              type="button"
-              onClick={() => sendWhatsAppCode(fullNumber)}
-              className="min-h-11 cursor-pointer border-0 bg-transparent p-0 text-sm font-medium text-[#5C635E] hover:text-[#15201B]"
-            >
-              Resend code
-            </button>
+            {!expired && (
+              <button
+                type="button"
+                onClick={() => onSendCode()}
+                className="min-h-11 cursor-pointer border-0 bg-transparent p-0 text-sm font-medium text-[#5C635E] hover:text-[#15201B]"
+              >
+                New code
+              </button>
+            )}
           </div>
-        </form>
+        </div>
       )}
 
       <p className="m-0 mt-1 text-sm text-[#5C635E]">
-        New to SellAI?{" "}
-        <Link href="/inbox" className="font-bold text-forest underline">
-          Set up your shop
+        Just looking?{" "}
+        <Link href="/shop" className="font-bold text-forest underline">
+          Visit the shop
         </Link>
       </p>
     </div>

@@ -108,6 +108,18 @@ create table if not exists rewards (
 );
 create index if not exists rewards_customer_idx on rewards(customer_handle);
 
+-- Seller logins: a one-time code the seller sends from their own WhatsApp (see src/auth/login.ts).
+create table if not exists login_challenges (
+  id text primary key,
+  phone text not null,
+  code text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  verified_at timestamptz,
+  claimed_at timestamptz
+);
+create index if not exists login_challenges_phone_idx on login_challenges(phone, created_at desc);
+
 create table if not exists settings (
   key text primary key,
   value jsonb not null,

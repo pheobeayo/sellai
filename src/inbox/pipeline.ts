@@ -4,7 +4,9 @@ import { INTENT_PRIORITY } from "@/agent/intents";
 import { runSalesAgent } from "@/agent/sales-agent";
 import type OpenAI from "openai";
 import type { DraftMeta, Enquiry, EnquiryRecord, Order } from "@/domain/types";
+import { verifyFromWhatsApp } from "@/auth/login";
 import { parseAttribution } from "@/integrations/attribution";
+import { sendWhatsAppText } from "@/integrations/whatsapp";
 import { applyRewardToOrder, rewardByCode } from "@/loyalty/rewards";
 import { describeReward } from "@/loyalty/rules";
 import { store } from "@/store/store";
@@ -47,6 +49,17 @@ export async function ingest(items: Enquiry[], opts: IngestOptions = {}): Promis
 
   const fresh: Enquiry[] = [];
   for (const e of items) {
+    // A seller logging in to the web app ("SellAI login 123456"), not a customer: never saved as an enquiry.
+    if (e.channel === "whatsapp" && e.authorHandle) {
+      const login = await verifyFromWhatsApp(e.authorHandle, e.text);
+      if (login.isLogin) {
+        console.log(`[auth] login message from ${e.authorHandle}: ${login.verified ? "verified" : "rejected"}`);
+        if (login.verified && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID) {
+          await sendWhatsAppText(e.authorHandle, "✅ You're signed in to SellAI on the web. If this wasn't you, sign out from the app.").catch(() => {});
+        }
+        continue;
+      }
+    }
     if (await store.addEnquiry(e)) {
       fresh.push(e);
       out.inserted.push(e.id);

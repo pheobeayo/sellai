@@ -132,6 +132,14 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - **Redeemed automatically.** When that customer next orders on WhatsApp, the sales agent's `create_order_draft` tool applies the reward and returns the discount, so the agent can mention it and the grounding check still holds. A buyer who started on Facebook gets it at confirmation, once their WhatsApp number is known. The reward is marked used when the order is paid.
 - **WhatsApp's 24-hour rule is respected:** within 24 hours of the customer's last message the thank-you goes out through the Cloud API; otherwise SellAI opens WhatsApp with the message filled in for the vendor to send from their own phone.
 
+### Seller login
+
+The inbox, catalogue, analytics and customer pages, and every `/api/*` route except the Meta webhook, need a signed-in seller (`proxy.ts`). The shop, landing page, checkout links and privacy page stay public.
+
+- **Log in with WhatsApp, the other way round.** The seller enters their number, SellAI shows a one-time code, and the seller sends `SellAI login 123456` *from their own WhatsApp* to the shop's number. The signed Meta webhook tells us which number sent it, which proves the seller controls that WhatsApp account, and the login page signs itself in. Because the seller starts the chat, no WhatsApp authentication template (and no template approval) is needed. Codes are single-use, expire after 10 minutes, are bound to the browser that asked for them, and only work for numbers in `SELLER_WHATSAPP_NUMBERS`. Login messages never appear in the inbox.
+- **Optional passcode** (`SELLER_PASSCODE`) for a shop assistant or for judges without the seller's phone.
+- Sessions are HMAC-signed cookies (`SESSION_SECRET`), httpOnly, 7 days.
+
 ### Roadmap
 
 - [x] Attribution dashboard: revenue per post and the enquiry → click → order funnel
@@ -142,6 +150,8 @@ When a buyer is ready, the agent creates a draft order (`SA-XXXX`) linked to the
 - [x] Independent verification checks and autopilot for low-risk replies
 - [x] Agent scenario test suite (24 scripted conversations)
 - [x] Loyal customers: tiers, AI-suggested rewards within vendor rules, automatic redemption on the next order
+- [x] Seller login with WhatsApp (reverse OTP) and optional passcode
+- [ ] Facebook Login for sellers
 - [ ] Reply to Instagram and Facebook comments through the Graph API
 - [ ] Approved WhatsApp templates for thank-you messages outside the 24-hour window
 

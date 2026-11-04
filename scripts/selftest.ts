@@ -378,4 +378,47 @@ assert.equal(sb.checks.passed, false, "₦250,000 isn't what Bimbo spent, so the
 assert.match(sb.preview, /10% off your next order/);
 assert.ok(sug.skipped.some((x) => x.handle === loyalNo), "no suggestion returned for Ada → reported as skipped");
 
+// ── Seller login ──────────────────────────────────────────────────────────
+process.env.SELLER_WHATSAPP_NUMBERS = "2348032215653, 08011112222";
+process.env.VENDOR_WHATSAPP_NUMBER = "15552086290";
+process.env.SELLER_PASSCODE = "judges-2026";
+const A = await import("@/auth/session");
+const tok = await A.createSessionToken("wa:2348032215653");
+assert.equal((await A.verifySessionToken(tok))?.sub, "wa:2348032215653");
+assert.equal(await A.verifySessionToken(tok.slice(0, -2) + (tok.endsWith("A") ? "BB" : "AA")), null, "tampered signature rejected");
+const [pl, sig] = tok.split(".");
+const forged = Buffer.from(JSON.stringify({ sub: "wa:2340000000000", exp: Date.now() + 1e9 })).toString("base64url");
+assert.equal(await A.verifySessionToken(`${forged}.${sig}`), null, "changed payload rejected");
+assert.equal(await A.verifySessionToken(await A.createSessionToken("x", -1)), null, "expired session rejected");
+assert.ok(pl);
+
+const Lg = await import("@/auth/login");
+assert.equal(Lg.normalizePhone("0801 111 2222"), "2348011112222");
+assert.equal(Lg.isAllowedSeller("+234 801 111 2222"), true);
+await assert.rejects(Lg.startChallenge("+2349099999999"), Lg.LoginError, "unknown numbers can't start a login");
+const ch = await Lg.startChallenge("+2348032215653");
+assert.match(ch.code, /^\d{6}$/);
+assert.equal(ch.waLink, `https://wa.me/15552086290?text=${encodeURIComponent(`SellAI login ${ch.code}`)}`);
+assert.equal((await Lg.claimChallenge(ch.id)).status, "pending");
+const wrongCode = String((Number(ch.code) + 1) % 1_000_000).padStart(6, "0");
+assert.deepEqual(await Lg.verifyFromWhatsApp("2348032215653", `SellAI login ${wrongCode}`), { isLogin: true, verified: false });
+assert.deepEqual(await Lg.verifyFromWhatsApp("2348011112222", `SellAI login ${ch.code}`), { isLogin: true, verified: false }, "code only works from the number that requested it");
+assert.deepEqual(await Lg.verifyFromWhatsApp("2348032215653", "How much is the wig?"), { isLogin: false, verified: false });
+
+// Through the real webhook pipeline: the login message signs in and never becomes an enquiry.
+const r = await ingest([{ id: "wa_login_1", channel: "whatsapp", text: `sellai LOGIN ${ch.code}`, authorHandle: "2348032215653", receivedAt: new Date().toISOString() }], { triage: false });
+assert.equal(r.inserted.length, 0);
+assert.equal(await store.enquiry("wa_login_1"), undefined);
+const claimed = await Lg.claimChallenge(ch.id);
+assert.deepEqual(claimed, { status: "verified", phone: "2348032215653" });
+assert.notEqual((await Lg.claimChallenge(ch.id)).status, "verified", "a code signs in once");
+assert.equal((await Lg.claimChallenge("made-up-id")).status, "expired");
+
+assert.equal(Lg.checkPasscode("judges-2026"), true);
+assert.equal(Lg.checkPasscode("judges-2025"), false);
+const { safeNext } = await import("../proxy");
+assert.equal(safeNext("/customers?x=1"), "/customers?x=1");
+assert.equal(safeNext("https://evil.example"), "/inbox");
+assert.equal(safeNext("//evil.example"), "/inbox");
+
 console.log("selftest: all checks passed");

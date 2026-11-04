@@ -5,7 +5,7 @@ import LoginForm from "../../components/login/LoginForm";
 export const metadata = {
   title: "Seller login · SellAI",
   description:
-    "Log in to your SellAI sales desk with WhatsApp, Facebook or Instagram.",
+    "Log in to your SellAI sales desk with WhatsApp.",
 };
 
 export default function LoginPage() {
@@ -41,7 +41,7 @@ export default function LoginPage() {
           </h1>
           <p className="m-0 hidden max-w-[460px] text-[15px] leading-[1.55] text-[#CDEBDC] md:block">
             Log in with the account your shop runs on. SellAI only reads your
-            own posts and messages, through Meta&’s official APIs.
+            own posts and messages, through Meta’s official APIs.
           </p>
         </div>
       </aside>
