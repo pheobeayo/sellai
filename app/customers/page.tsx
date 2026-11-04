@@ -1,15 +1,47 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import type { CheckReport } from "@/agent/checks";
+import { Sparkles } from "lucide-react";
 import type { Reward, RewardKind } from "@/domain/types";
 import type { Customer, LoyaltySummary, Source } from "@/loyalty/customers";
 import { describeReward, TIER_LABEL, type LoyaltyRules } from "@/loyalty/rules";
 import type { Suggestion } from "@/loyalty/suggest";
+import SellerShell from "../../components/seller/SellerShell";
+import AnalyticsTabs from "../../components/seller/AnalyticsTabs";
+import PageHeader from "../../components/seller/PageHeader";
+import Panel from "../../components/seller/Panel";
+import Segmented from "../../components/seller/Segmented";
+import Notice from "../../components/seller/Notice";
+import StatCard from "../../components/seller/StatCard";
+import StatusPill from "../../components/seller/StatusPill";
+import Tag, { type TagTone } from "../../components/seller/Tag";
+import ChecksLine from "../../components/customers/ChecksLine";
+import IssuedBox, {
+  type IssueResult,
+} from "../../components/customers/IssuedBox";
+import {
+  btn,
+  btnSmGhost,
+  code,
+  fieldLabel,
+  input,
+  muted,
+  table,
+  tableWrap,
+  td,
+  tdNum,
+  textarea,
+  th,
+  thNum,
+} from "../../components/seller/styles";
 
 const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
-const SOURCE_LABEL: Record<Source, string> = { facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp", other: "Other" };
+const SOURCE_LABEL: Record<Source, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  whatsapp: "WhatsApp",
+  other: "Other",
+};
 const ago = (iso?: string) => {
   if (!iso) return "–";
   const d = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000);
@@ -17,8 +49,21 @@ const ago = (iso?: string) => {
 };
 
 type RewardRow = Reward & { description: string };
-type Draft = Suggestion & { kind: RewardKind; value: number; text: string; state?: "sending" | "done"; result?: IssueResult; error?: string };
-interface IssueResult { reward: Reward; fullMessage: string; adjusted?: string; delivered: boolean; waLink?: string; note?: string }
+type Draft = Suggestion & {
+  kind: RewardKind;
+  value: number;
+  text: string;
+  state?: "sending" | "done";
+  result?: IssueResult;
+  error?: string;
+};
+const TIER_TONE: Record<string, TagTone> = {
+  unpaid: "grey",
+  new: "sand",
+  returning: "mint",
+  loyal: "solidGreen",
+  vip: "yellow",
+};
 
 export default function CustomersPage() {
   const [source, setSource] = useState<Source | "all">("all");
@@ -29,15 +74,21 @@ export default function CustomersPage() {
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [skipped, setSkipped] = useState<Array<{ handle: string; why: string }>>([]);
+  const [skipped, setSkipped] = useState<
+    Array<{ handle: string; why: string }>
+  >([]);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/customers${source === "all" ? "" : `?source=${source}`}`, { cache: "no-store" });
+      const res = await fetch(
+        `/api/customers${source === "all" ? "" : `?source=${source}`}`,
+        { cache: "no-store" },
+      );
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message ?? "Could not load customers");
+      if (!res.ok)
+        throw new Error(json.error?.message ?? "Could not load customers");
       setCustomers(json.customers);
       setSummary(json.summary);
       setRules(json.rules);
@@ -75,9 +126,19 @@ export default function CustomersPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message ?? "Suggestions failed");
-      setDrafts((json.suggestions as Suggestion[]).map((s) => ({ ...s, kind: s.proposal.kind, value: s.proposal.value, text: s.message })));
+      setDrafts(
+        (json.suggestions as Suggestion[]).map((s) => ({
+          ...s,
+          kind: s.proposal.kind,
+          value: s.proposal.value,
+          text: s.message,
+        })),
+      );
       setSkipped(json.skipped);
-      if (!json.suggestions.length && !json.skipped.length) setError("No loyal customers without a reward yet. Pick customers in the table first.");
+      if (!json.suggestions.length && !json.skipped.length)
+        setError(
+          "No loyal customers without a reward yet. Pick customers in the table first.",
+        );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -85,7 +146,8 @@ export default function CustomersPage() {
     }
   }
 
-  const patch = (i: number, p: Partial<Draft>) => setDrafts((ds) => ds.map((d, j) => (j === i ? { ...d, ...p } : d)));
+  const patch = (i: number, p: Partial<Draft>) =>
+    setDrafts((ds) => ds.map((d, j) => (j === i ? { ...d, ...p } : d)));
 
   async function give(i: number, send: boolean) {
     const d = drafts[i];
@@ -94,231 +156,472 @@ export default function CustomersPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        handle: d.customer.handle, kind: d.kind, value: d.value, giftVariantId: d.kind === "gift" ? d.proposal.giftVariantId : undefined,
-        message: d.text, reason: d.reason, code: d.code, send,
+        handle: d.customer.handle,
+        kind: d.kind,
+        value: d.value,
+        giftVariantId: d.kind === "gift" ? d.proposal.giftVariantId : undefined,
+        message: d.text,
+        reason: d.reason,
+        code: d.code,
+        send,
       }),
     });
     const json = await res.json();
-    if (!res.ok) return patch(i, { state: undefined, error: json.error?.message ?? "Could not give reward" });
+    if (!res.ok)
+      return patch(i, {
+        state: undefined,
+        error: json.error?.message ?? "Could not give reward",
+      });
     patch(i, { state: "done", result: json });
     load();
   }
 
-  async function rewardAction(code: string, action: "cancel" | "sent_manually") {
-    const res = await fetch(`/api/rewards/${code}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+  async function rewardAction(
+    code: string,
+    action: "cancel" | "sent_manually",
+  ) {
+    const res = await fetch(`/api/rewards/${code}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
     if (!res.ok) setError((await res.json()).error?.message ?? "Update failed");
     load();
   }
 
   const s = summary;
 
-  return (
-    <main>
-      <nav className="nav"><Link href="/">Home</Link><Link href="/inbox">Inbox</Link><Link href="/catalogue">Catalogue</Link><Link href="/dashboard">Dashboard</Link><span>Customers</span></nav>
-      <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
-        <div>
-          <h1>Your loyal customers</h1>
-          <p className="sub" style={{ marginBottom: 0 }}>Everyone who has bought from you, wherever they found you, and who deserves a thank-you.</p>
-        </div>
-        <div className="seg" role="group" aria-label="Where they bought">
-          {(["all", "facebook", "instagram", "whatsapp"] as const).map((x) => (
-            <button key={x} className={x === source ? "on" : ""} onClick={() => { setSource(x); setSelected(new Set()); }}>
-              {x === "all" ? "All" : SOURCE_LABEL[x]}
-            </button>
-          ))}
-        </div>
-      </div>
+  const sourceOptions = (
+    ["all", "facebook", "instagram", "whatsapp"] as const
+  ).map((x) => ({ value: x, label: x === "all" ? "All" : SOURCE_LABEL[x] }));
 
-      {error && <p className="err">{error}</p>}
+  return (
+    <SellerShell>
+      <AnalyticsTabs />
+      <PageHeader
+        title="Your loyal customers"
+        description="Everyone who has bought from you, wherever they found you, and who deserves a thank-you."
+        actions={
+          <Segmented
+            ariaLabel="Where they bought"
+            options={sourceOptions}
+            value={source}
+            onChange={(x) => {
+              setSource(x);
+              setSelected(new Set());
+            }}
+          />
+        }
+      />
+
+      {error && <Notice tone="error">{error}</Notice>}
 
       {s && (
-        <section className="kpis">
-          <div className="hero">
-            <div className="label">Revenue from repeat customers</div>
-            <div className="value">{naira(s.repeatRevenueNaira)}</div>
-            <div className="gloss">of {naira(s.revenueNaira)} from {s.customers} paying customer{s.customers === 1 ? "" : "s"}</div>
-          </div>
-          <Stat label="Came back to buy again" value={`${s.repeatRate}%`} sub={`${s.repeatCustomers} repeat customer${s.repeatCustomers === 1 ? "" : "s"}`} />
-          <Stat label="VIP and loyal" value={String(s.vip + s.loyal)} sub={`${s.vip} VIP · ${s.loyal} loyal`} />
-          <Stat label="Going quiet" value={String(s.lapsing)} sub={`loyal, no purchase in ${rules?.lapsingDays ?? 45}+ days`} />
-        </section>
+        <div className="flex flex-wrap gap-4">
+          <StatCard
+            hero
+            label="Revenue from repeat customers"
+            value={naira(s.repeatRevenueNaira)}
+            sub={`of ${naira(s.revenueNaira)} from ${s.customers} paying customer${s.customers === 1 ? "" : "s"}`}
+          />
+          <StatCard
+            label="Came back to buy again"
+            value={`${s.repeatRate}%`}
+            sub={`${s.repeatCustomers} repeat customer${s.repeatCustomers === 1 ? "" : "s"}`}
+          />
+          <StatCard
+            label="VIP and loyal"
+            value={String(s.vip + s.loyal)}
+            sub={`${s.vip} VIP · ${s.loyal} loyal`}
+          />
+          <StatCard
+            label="Going quiet"
+            value={String(s.lapsing)}
+            sub={`Loyal, no purchase in ${rules?.lapsingDays ?? 45}+ days`}
+          />
+        </div>
       )}
 
-      <section className="panel" style={{ marginTop: 16 }}>
-        <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
-          <div>
-            <strong>Customers</strong>
-            {rules && (
-              <p className="gloss" style={{ margin: "2px 0 0" }}>
-                Returning: 2 paid orders · Loyal: {rules.loyalOrders}+ orders or {naira(rules.loyalSpendNaira)}+ · VIP: {rules.vipOrders}+ orders or {naira(rules.vipSpendNaira)}+
-              </p>
-            )}
-          </div>
-          <button onClick={suggest} disabled={thinking || customers.length === 0}>
-            {thinking ? "Muse Spark is choosing rewards…" : selected.size ? `Suggest rewards for ${selected.size} selected` : "Suggest rewards for loyal customers"}
+      <Panel
+        title="Customers"
+        description={
+          rules
+            ? `Returning: 2 paid orders · Loyal: ${rules.loyalOrders}+ orders or ${naira(rules.loyalSpendNaira)}+ · VIP: ${rules.vipOrders}+ orders or ${naira(rules.vipSpendNaira)}+`
+            : undefined
+        }
+        action={
+          <button
+            type="button"
+            className={btn}
+            onClick={suggest}
+            disabled={thinking || customers.length === 0}
+          >
+            <Sparkles aria-hidden size={16} strokeWidth={2.4} />
+            {thinking
+              ? "Muse Spark is choosing rewards…"
+              : selected.size
+                ? `Suggest rewards for ${selected.size} selected`
+                : "Suggest rewards for loyal customers"}
           </button>
-        </div>
-        <div className="tablewrap">
-          <table>
+        }
+      >
+        <div className={tableWrap}>
+          <table className={`${table} min-w-[960px]`}>
             <thead>
               <tr>
-                <th></th><th>Customer</th><th>Tier</th><th>Bought through</th><th className="n">Paid orders</th><th className="n">Spent</th>
-                <th>Favourite</th><th>Last purchase</th><th>Reward</th>
+                <th className={th}>
+                  <span className="sr-only">Select</span>
+                </th>
+                <th className={th}>Customer</th>
+                <th className={th}>Tier</th>
+                <th className={th}>Bought through</th>
+                <th className={thNum}>Paid orders</th>
+                <th className={thNum}>Spent</th>
+                <th className={th}>Favourite</th>
+                <th className={th}>Last purchase</th>
+                <th className={th}>Reward</th>
               </tr>
             </thead>
             <tbody>
               {customers.map((c) => (
-                <tr key={c.handle}>
-                  <td><input type="checkbox" aria-label={`Select ${c.name}`} checked={selected.has(c.handle)} onChange={() => toggle(c.handle)} disabled={c.tier === "unpaid"} /></td>
-                  <td>
-                    <strong>{c.name}</strong>{c.isDemo && <span className="gloss"> demo</span>}
-                    <div className="gloss">
+                <tr
+                  key={c.handle}
+                  className={
+                    selected.has(c.handle)
+                      ? "bg-[#F3FAF6]"
+                      : "hover:bg-[#FBFAF7]"
+                  }
+                >
+                  <td className={td}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${c.name}`}
+                      checked={selected.has(c.handle)}
+                      onChange={() => toggle(c.handle)}
+                      disabled={c.tier === "unpaid"}
+                      className="size-[18px] cursor-pointer accent-[#2F7A5E] disabled:cursor-not-allowed"
+                    />
+                  </td>
+                  <td className={td}>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      {c.name}
+                      {c.isDemo && <Tag tone="grey">demo</Tag>}
+                    </div>
+                    <div className="mt-1 text-xs text-[#5C635E]">
                       {c.reachableOnWhatsApp ? `+${c.handle}` : c.handle}
-                      {c.alsoKnownAs.length > 0 && ` · first seen as ${c.alsoKnownAs.map((a) => `“${a}”`).join(", ")}`}
+                      {c.alsoKnownAs.length > 0 &&
+                        ` · first seen as ${c.alsoKnownAs.map((a) => `“${a}”`).join(", ")}`}
                     </div>
                   </td>
-                  <td><span className={`tag tier-${c.tier}`}>{TIER_LABEL[c.tier]}</span>{c.lapsing && <span className="tag tier-lapsing">Going quiet</span>}</td>
-                  <td>{c.sources.map((x) => SOURCE_LABEL[x]).join(", ")}</td>
-                  <td className="n">{c.paidOrders}{c.unpaidOrders ? <span className="gloss"> +{c.unpaidOrders} unpaid</span> : null}</td>
-                  <td className="n strong">{naira(c.spentNaira)}</td>
-                  <td><div className="cap">{c.favouriteProduct ?? "–"}</div></td>
-                  <td>{ago(c.lastPaidAt ?? c.lastOrderAt)}</td>
-                  <td>{c.activeReward ? <code>{c.activeReward.code}</code> : <span className="gloss">–</span>}</td>
+                  <td className={td}>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Tag tone={TIER_TONE[c.tier] ?? "sand"}>
+                        {TIER_LABEL[c.tier]}
+                      </Tag>
+                      {c.lapsing && <Tag tone="clay">Going quiet</Tag>}
+                    </div>
+                  </td>
+                  <td className={td}>
+                    {c.sources.map((x) => SOURCE_LABEL[x]).join(", ")}
+                  </td>
+                  <td className={tdNum}>
+                    {c.paidOrders}
+                    {c.unpaidOrders ? (
+                      <span className="text-xs text-[#5C635E]">
+                        {" "}
+                        +{c.unpaidOrders} unpaid
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className={`${tdNum} font-bold text-[#1F5A44]`}>
+                    {naira(c.spentNaira)}
+                  </td>
+                  <td className={td}>
+                    <div className="line-clamp-2 max-w-[200px]">
+                      {c.favouriteProduct ?? "–"}
+                    </div>
+                  </td>
+                  <td className={`${td} whitespace-nowrap`}>
+                    {ago(c.lastPaidAt ?? c.lastOrderAt)}
+                  </td>
+                  <td className={td}>
+                    {c.activeReward ? (
+                      <code className={code}>{c.activeReward.code}</code>
+                    ) : (
+                      <span className="text-[#5C635E]">–</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {customers.length === 0 && (
-                <tr><td colSpan={9} className="gloss">No customers yet. They appear here once a buyer confirms an order on WhatsApp or you mark one paid.</td></tr>
+                <tr>
+                  <td
+                    colSpan={9}
+                    className={`${td} text-center text-[#5C635E]`}
+                  >
+                    No customers yet. They appear here once a buyer confirms an
+                    order on WhatsApp or you mark one paid.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+      </Panel>
 
       {(drafts.length > 0 || skipped.length > 0) && (
-        <section style={{ marginTop: 16 }}>
-          <h2 style={{ fontSize: 17, margin: "0 0 4px" }}>Suggested rewards</h2>
-          <p className="gloss" style={{ marginTop: 0 }}>
-            Muse Spark picked each reward within your limits and wrote the thank-you. The reward line is fixed text from your rules, so it never invents an amount. Edit anything before you send.
-          </p>
-          {skipped.map((x) => <p key={x.handle} className="gloss">Skipped: {x.why}</p>)}
-          <div className="grid">
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h2 className="m-0 font-display text-[24px] font-bold tracking-[-0.6px]">
+              Suggested rewards
+            </h2>
+            <p className={`m-0 max-w-[720px] ${muted}`}>
+              Muse Spark picked each reward within your limits and wrote the
+              thank-you. The reward line is fixed text from your rules, so it
+              never invents an amount. Edit anything before you send.
+            </p>
+          </div>
+          {skipped.map((x) => (
+            <Notice key={x.handle} tone="info">
+              Skipped: {x.why}
+            </Notice>
+          ))}
+          <div className="flex flex-wrap gap-5">
             {drafts.map((d, i) => (
-              <div key={d.customer.handle} className="panel">
-                <div className="row" style={{ justifyContent: "space-between", marginTop: 0 }}>
-                  <strong>{d.customer.name}</strong>
-                  <span>
-                    <span className={`tag tier-${d.customer.tier}`}>{TIER_LABEL[d.customer.tier]}</span>
-                    {d.customer.lapsing && <span className="tag tier-lapsing">Going quiet</span>}
-                  </span>
-                </div>
-                <p className="gloss" style={{ margin: "4px 0 10px" }}>{d.reason}</p>
-
-                <div className="row">
-                  <select value={d.kind} onChange={(e) => patch(i, { kind: e.target.value as RewardKind, value: e.target.value === "percent_off" ? Math.min(d.value || 5, rules?.maxPercentOff ?? 10) : e.target.value === "amount_off" ? 2000 : 0 })} disabled={d.state === "done"}>
-                    <option value="percent_off">Percent off</option>
-                    <option value="amount_off">Amount off</option>
-                    <option value="free_delivery">Free delivery</option>
-                    {d.proposal.kind === "gift" && <option value="gift">Free gift</option>}
-                  </select>
+              <Panel
+                key={d.customer.handle}
+                className="w-full lg:w-[calc(50%-10px)]"
+                title={d.customer.name}
+                description={d.reason}
+                action={
+                  <div className="flex flex-wrap gap-1.5">
+                    <Tag tone={TIER_TONE[d.customer.tier] ?? "sand"}>
+                      {TIER_LABEL[d.customer.tier]}
+                    </Tag>
+                    {d.customer.lapsing && <Tag tone="clay">Going quiet</Tag>}
+                  </div>
+                }
+              >
+                <div className="flex flex-wrap items-end gap-2.5">
+                  <label className={`${fieldLabel} min-w-[170px] flex-1`}>
+                    Reward
+                    <select
+                      className={input}
+                      value={d.kind}
+                      onChange={(e) =>
+                        patch(i, {
+                          kind: e.target.value as RewardKind,
+                          value:
+                            e.target.value === "percent_off"
+                              ? Math.min(
+                                  d.value || 5,
+                                  rules?.maxPercentOff ?? 10,
+                                )
+                              : e.target.value === "amount_off"
+                                ? 2000
+                                : 0,
+                        })
+                      }
+                      disabled={d.state === "done"}
+                    >
+                      <option value="percent_off">Percent off</option>
+                      <option value="amount_off">Amount off</option>
+                      <option value="free_delivery">Free delivery</option>
+                      {d.proposal.kind === "gift" && (
+                        <option value="gift">Free gift</option>
+                      )}
+                    </select>
+                  </label>
                   {(d.kind === "percent_off" || d.kind === "amount_off") && (
-                    <input className="text" style={{ maxWidth: 120 }} type="number" min={d.kind === "percent_off" ? 1 : 500} step={d.kind === "percent_off" ? 1 : 500}
-                      max={d.kind === "percent_off" ? rules?.maxPercentOff : undefined} value={d.value} disabled={d.state === "done"}
-                      onChange={(e) => patch(i, { value: Number(e.target.value) })} aria-label={d.kind === "percent_off" ? "Percent" : "Naira amount"} />
+                    <label className={`${fieldLabel} w-[130px]`}>
+                      {d.kind === "percent_off" ? "Percent" : "Amount (₦)"}
+                      <input
+                        className={input}
+                        type="number"
+                        min={d.kind === "percent_off" ? 1 : 500}
+                        step={d.kind === "percent_off" ? 1 : 500}
+                        max={
+                          d.kind === "percent_off"
+                            ? rules?.maxPercentOff
+                            : undefined
+                        }
+                        value={d.value}
+                        disabled={d.state === "done"}
+                        onChange={(e) =>
+                          patch(i, { value: Number(e.target.value) })
+                        }
+                      />
+                    </label>
                   )}
-                  <span className="gloss">{d.kind === "percent_off" ? `max ${rules?.maxPercentOff ?? 10}%` : d.kind === "amount_off" ? "capped at 10% of their average order" : ""}</span>
                 </div>
-                {d.adjusted && <p className="flag" style={{ fontSize: 13 }}>Adjusted: {d.adjusted}</p>}
+                {(d.kind === "percent_off" || d.kind === "amount_off") && (
+                  <p className="m-0 -mt-1 text-xs text-[#5C635E]">
+                    {d.kind === "percent_off"
+                      ? `Max ${rules?.maxPercentOff ?? 10}%`
+                      : "Capped at 10% of their average order"}
+                  </p>
+                )}
+                {d.adjusted && (
+                  <Notice tone="warning">Adjusted: {d.adjusted}</Notice>
+                )}
 
-                <textarea style={{ minHeight: 90, marginTop: 10 }} value={d.text} onChange={(e) => patch(i, { text: e.target.value })} disabled={d.state === "done"} aria-label="Thank-you message" />
-                <p className="draft" style={{ marginTop: 8, fontSize: 14 }}>
-                  🎁 Your reward: {d.kind === "gift" ? d.preview.split("🎁 Your reward: ")[1]?.split(". It's applied")[0] : describeReward({ kind: d.kind, value: d.value }, [])}. It&apos;s applied automatically when you order with us on WhatsApp (ref {d.code}).
+                <label className={fieldLabel}>
+                  Thank-you message
+                  <textarea
+                    className={`${textarea} min-h-[100px]`}
+                    value={d.text}
+                    onChange={(e) => patch(i, { text: e.target.value })}
+                    disabled={d.state === "done"}
+                  />
+                </label>
+                <p className="m-0 rounded-[18px_18px_4px_18px] bg-[#E2F3EA] px-4 py-3 text-sm leading-normal">
+                  🎁 Your reward:{" "}
+                  {d.kind === "gift"
+                    ? d.preview
+                        .split("🎁 Your reward: ")[1]
+                        ?.split(". It's applied")[0]
+                    : describeReward({ kind: d.kind, value: d.value }, [])}
+                  . It&apos;s applied automatically when you order with us on
+                  WhatsApp (ref {d.code}).
                 </p>
                 <ChecksLine report={d.checks} />
 
-                {d.error && <p className="err">{d.error}</p>}
+                {d.error && <Notice tone="error">{d.error}</Notice>}
                 {d.state !== "done" ? (
-                  <div className="row">
-                    {d.customer.canMessageNow && whatsappConnected ? (
-                      <button onClick={() => give(i, true)} disabled={d.state === "sending"}>Give reward &amp; send on WhatsApp</button>
-                    ) : (
-                      <button onClick={() => give(i, true)} disabled={d.state === "sending"}>Give reward</button>
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <button
+                        type="button"
+                        className={btn}
+                        onClick={() => give(i, true)}
+                        disabled={d.state === "sending"}
+                      >
+                        {d.customer.canMessageNow && whatsappConnected
+                          ? "Give reward and send on WhatsApp"
+                          : "Give reward"}
+                      </button>
+                    </div>
+                    {!d.customer.canMessageNow && (
+                      <p className={`m-0 ${muted}`}>
+                        They haven&apos;t messaged in 24 hours, so you&apos;ll
+                        send it from your own WhatsApp.
+                      </p>
                     )}
-                    {!d.customer.canMessageNow && <span className="gloss">They haven&apos;t messaged in 24 hours, so you&apos;ll send it from your own WhatsApp.</span>}
                   </div>
                 ) : (
-                  d.result && <IssuedBox r={d.result} onSent={() => rewardAction(d.result!.reward.code, "sent_manually")} />
+                  d.result && (
+                    <IssuedBox
+                      r={d.result}
+                      onSent={() =>
+                        rewardAction(d.result!.reward.code, "sent_manually")
+                      }
+                    />
+                  )
                 )}
-              </div>
+              </Panel>
             ))}
           </div>
         </section>
       )}
 
-      <section className="panel" style={{ marginTop: 16 }}>
-        <strong>Rewards given</strong>
-        <p className="gloss" style={{ marginTop: 2 }}>When the customer next orders on WhatsApp, the sales agent applies the reward and the order total drops automatically. It counts as used once the order is paid.</p>
-        <div className="tablewrap">
-          <table>
-            <thead><tr><th>Code</th><th>Customer</th><th>Reward</th><th>Status</th><th>Given</th><th>Expires</th><th>Used on</th><th></th></tr></thead>
+      <Panel
+        title="Rewards given"
+        description="When the customer next orders on WhatsApp, the sales agent applies the reward and the order total drops automatically. It counts as used once the order is paid."
+      >
+        <div className={tableWrap}>
+          <table className={table}>
+            <thead>
+              <tr>
+                <th className={th}>Code</th>
+                <th className={th}>Customer</th>
+                <th className={th}>Reward</th>
+                <th className={th}>Status</th>
+                <th className={th}>Given</th>
+                <th className={th}>Expires</th>
+                <th className={th}>Used on</th>
+                <th className={th}>
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
             <tbody>
               {rewards.map((r) => (
-                <tr key={r.code}>
-                  <td><code>{r.code}</code></td>
-                  <td>{r.customerName ?? r.customerHandle}</td>
-                  <td>{r.description}</td>
-                  <td><span className={`status ${r.status === "redeemed" ? "paid" : r.status === "cancelled" ? "cancelled" : "confirmed"}`}>{r.status === "issued" ? "unused" : r.status === "redeemed" ? "used" : "cancelled"}</span>{r.sentVia && <div className="gloss">{r.sentVia === "whatsapp_api" ? "sent on WhatsApp" : "sent by you"}</div>}</td>
-                  <td>{ago(r.createdAt)}</td>
-                  <td>{new Date(r.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</td>
-                  <td>{r.redeemedOrderRef ? <code>{r.redeemedOrderRef}</code> : "–"}</td>
-                  <td className="actions">{r.status === "issued" && <button className="ghost" onClick={() => rewardAction(r.code, "cancel")}>Cancel</button>}</td>
+                <tr key={r.code} className="hover:bg-[#FBFAF7]">
+                  <td className={td}>
+                    <code className={code}>{r.code}</code>
+                  </td>
+                  <td className={`${td} font-bold`}>
+                    {r.customerName ?? r.customerHandle}
+                  </td>
+                  <td className={td}>{r.description}</td>
+                  <td className={td}>
+                    <StatusPill
+                      status={
+                        r.status === "redeemed"
+                          ? "paid"
+                          : r.status === "cancelled"
+                            ? "cancelled"
+                            : "confirmed"
+                      }
+                      label={
+                        r.status === "issued"
+                          ? "unused"
+                          : r.status === "redeemed"
+                            ? "used"
+                            : "cancelled"
+                      }
+                    />
+                    {r.sentVia && (
+                      <div className="mt-1.5 text-xs text-[#5C635E]">
+                        {r.sentVia === "whatsapp_api"
+                          ? "sent on WhatsApp"
+                          : "sent by you"}
+                      </div>
+                    )}
+                  </td>
+                  <td className={`${td} whitespace-nowrap`}>
+                    {ago(r.createdAt)}
+                  </td>
+                  <td className={`${td} whitespace-nowrap`}>
+                    {new Date(r.expiresAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </td>
+                  <td className={td}>
+                    {r.redeemedOrderRef ? (
+                      <code className={code}>{r.redeemedOrderRef}</code>
+                    ) : (
+                      "–"
+                    )}
+                  </td>
+                  <td className={`${td} text-right`}>
+                    {r.status === "issued" && (
+                      <button
+                        type="button"
+                        className={btnSmGhost}
+                        onClick={() => rewardAction(r.code, "cancel")}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {rewards.length === 0 && <tr><td colSpan={8} className="gloss">No rewards yet.</td></tr>}
+              {rewards.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className={`${td} text-center text-[#5C635E]`}
+                  >
+                    No rewards yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      </section>
-    </main>
-  );
-}
-
-function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="stat">
-      <div className="label">{label}</div>
-      <div className="value">{value}</div>
-      <div className="gloss">{sub}</div>
-    </div>
-  );
-}
-
-function ChecksLine({ report }: { report: CheckReport }) {
-  const failed = report.checks.filter((c) => !c.ok);
-  if (!failed.length) return <p className="ok" style={{ fontSize: 13, margin: "6px 0 0" }}>✓ All {report.checks.length} message checks passed</p>;
-  return (
-    <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
-      {failed.map((c) => <li key={c.id} className={c.severity === "block" ? "flag" : "gloss"}>{c.label}{c.detail ? `: ${c.detail}` : ""}</li>)}
-    </ul>
-  );
-}
-
-function IssuedBox({ r, onSent }: { r: IssueResult; onSent: () => void }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div style={{ marginTop: 10 }}>
-      <p className="ok" style={{ margin: 0 }}>
-        {r.delivered ? `✓ Reward ${r.reward.code} given and sent on WhatsApp.` : `✓ Reward ${r.reward.code} given.`}
-      </p>
-      {r.adjusted && <p className="gloss">Adjusted: {r.adjusted}</p>}
-      {!r.delivered && (
-        <>
-          {r.note && <p className="gloss">{r.note}</p>}
-          <div className="row">
-            {r.waLink && <a href={r.waLink} target="_blank" rel="noopener noreferrer" onClick={onSent}><button>Open WhatsApp</button></a>}
-            <button className="ghost" onClick={async () => { await navigator.clipboard.writeText(r.fullMessage).catch(() => {}); setCopied(true); onSent(); }}>{copied ? "Copied" : "Copy message"}</button>
-          </div>
-        </>
-      )}
-    </div>
+      </Panel>
+    </SellerShell>
   );
 }

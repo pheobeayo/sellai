@@ -1,140 +1,215 @@
+import Image from "next/image";
 import Link from "next/link";
-import type { Product } from "@/domain/types";
 import { seedVendor } from "@/store/seed";
-import { store } from "@/store/store";
-import "./landing.css";
-
-export const dynamic = "force-dynamic"; // the shop shows the live catalogue
-
-export const metadata = {
-  title: "SellAI · Never miss a buyer in your comments",
-  description: "An AI sales desk for vendors who sell on Instagram, Facebook and WhatsApp. Built on Meta's models.",
-};
-
-const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 function waLink(text: string) {
-  const number = (process.env.VENDOR_WHATSAPP_NUMBER || seedVendor.whatsappNumber).replace(/\D/g, "");
+  const number = (
+    process.env.VENDOR_WHATSAPP_NUMBER || seedVendor.whatsappNumber
+  ).replace(/\D/g, "");
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
-async function loadProducts(): Promise<Product[]> {
-  try {
-    return (await store.products()).slice(0, 6);
-  } catch {
-    return []; // the landing page must never fail because the database is down
-  }
+const steps = [
+  {
+    title: "Photo to listing",
+    body: "Snap a product. It is named, cut out and turned into a studio shot. You set the price.",
+    icon: "camera",
+  },
+  {
+    title: "Finds the buyers",
+    body: "Every comment and DM is sorted by buying intent. Spam out, complaints flagged.",
+    icon: "target",
+  },
+  {
+    title: "Replies from your real data",
+    body: "Price, stock and delivery are looked up first. A made-up price or bank number is blocked.",
+    icon: "chat",
+  },
+  {
+    title: "Shows which post made money",
+    body: "Checkout links tie every order back to the post that started it.",
+    icon: "chart",
+  },
+] as const;
+
+const models = ["Muse Spark 1.3", "Muse Voice", "SAM 3.1", "Muse Image"];
+
+function StepIcon({ name }: { name: (typeof steps)[number]["icon"] }) {
+  const paths = {
+    camera: (
+      <>
+        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+        <circle cx="12" cy="13" r="3" />
+      </>
+    ),
+    target: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="5" />
+        <circle cx="12" cy="12" r="1" />
+      </>
+    ),
+    chat: (
+      <path d="M21 11.5a8.4 8.4 0 0 1-12.5 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z" />
+    ),
+    chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  };
+  return (
+    <svg
+      aria-hidden
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#1F5A44"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[name]}
+    </svg>
+  );
 }
 
-export default async function Landing() {
-  const products = await loadProducts();
+function ArrowUpRight({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M7 17 17 7M8 7h9v9" />
+    </svg>
+  );
+}
+
+export default function Home() {
   const shop = seedVendor.businessName;
 
   return (
-    <div className="lp">
-      <header className="lp-top">
-        <Link href="/" className="lp-brand"><span className="lp-mark">S</span>SellAI</Link>
-        <nav>
-          <a href="#shop">Shop</a>
-          <a href="#how">How it works</a>
-          <Link href="/inbox" className="lp-pill">Seller login</Link>
-        </nav>
-      </header>
-
-      <section className="lp-hero">
-        <div className="lp-hero-copy">
-          <p className="lp-kicker">For Instagram, Facebook and WhatsApp vendors</p>
-          <h1>Never miss a buyer in your comments again.</h1>
-          <p className="lp-lede">
-            SellAI reads every comment, DM and voice note, finds the real buyers, and drafts replies from your actual
-            prices and stock, in Pidgin, Yoruba, Igbo, Hausa or English. You approve, it sends, and every sale is traced
-            back to the post that made it.
+    <div className="text-[#15201B] w-[90%] mx-auto">
+      <Header />
+      <main className="flex justify-between items-center lg:flex-row md:flex-row flex-col mt-[96px] mb-6 md:mt-[112px]">
+        <div className="lg:w-[35%] md:w-[35%] w-full">
+          <p className="m-0 text-[10.5px] font-bold uppercase tracking-[1.4px] text-[#B4471F] md:text-[12.5px] md:tracking-[2px]">
+            For Instagram, Facebook and WhatsApp vendors
           </p>
+          <h1 className="m-0 text-balance font-display text-[35px] lg:text-[52px] md:text-[48px] font-black leading-none tracking-[-1.2px]">
+            Never miss a buyer in your comments again.
+          </h1>
+          <p className="my-4 text-sm leading-normal text-[#5C635E] text-[18px] md:leading-[1.55] xl:text-base">
+            SellAI reads every comment, DM and voice note, finds the real
+            buyers, and drafts replies from your actual prices and stock.
+            <span className="hidden md:inline">
+              {" "}
+              In Pidgin, Yoruba, Igbo, Hausa or English.
+            </span>
+          </p>
+        </div>
+        <div className="lg:w-[45%] md:w-[45%] w-full">
+          <Image
+            src="/sellai-hero.png"
+            alt="Two women trading at a market, with a buyer's Instagram comment, a SellAI reply draft and an order link"
+            width={1962}
+            height={1542}
+            priority
+            sizes="(min-width: 1280px) 45vw, (min-width: 768px) 50vw, 100vw"
+            className="h-full max-h-full w-auto max-w-full object-contain md:h-auto md:w-full xl:max-h-[92%] xl:w-auto"
+          />
+        </div>
 
-          <div className="lp-paths">
-            <Link href="/inbox" className="lp-path lp-path-seller">
-              <span className="lp-path-label">I sell online</span>
-              <strong>Open my sales desk</strong>
-              <span className="lp-path-sub">Inbox, catalogue and sales dashboard</span>
-              <span className="lp-arrow" aria-hidden>→</span>
-            </Link>
-            <a href={waLink(`Hi ${shop}! I found you on SellAI.`)} className="lp-path lp-path-buyer" target="_blank" rel="noopener noreferrer">
-              <span className="lp-path-label">I want to buy</span>
-              <strong>Chat with {shop}</strong>
-              <span className="lp-path-sub">On WhatsApp, replies in minutes</span>
-              <span className="lp-arrow" aria-hidden>→</span>
-            </a>
+        <div className="lg:w-[20%] md:w-[20%] w-full">
+          <Link
+            href="/inbox"
+            className="relative bg-forest px-3.5 py-3 text-[#F7F4EE] no-underline transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-12px_rgba(31,90,68,0.6)] motion-reduce:transition-none rounded-[20px] flex flex-col my-3"
+          >
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.8px]">
+              I sell online
+            </span>
+            <span className="font-display text-[13px] font-bold tracking-[-0.4px] md:text-xl">
+              Open my sales desk
+            </span>
+            <span className="hidden text-[13px] text-[#DCEFE5] md:block">
+              Inbox, catalogue, dashboard
+            </span>
+            <ArrowUpRight className="absolute right-4 top-4 hidden md:block" />
+          </Link>
+          <a
+            href={waLink(`Hi ${shop}! I found you on SellAI.`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative flex flex-col rounded-2xl border-2 border-[#E3DACB] bg-white px-3.5 py-3 text-[#15201B] no-underline transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-12px_rgba(31,90,68,0.45)] focus-visible:outline-[#B4471F] motion-reduce:transition-none md:rounded-[20px]"
+          >
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.8px] text-[#B4471F]">
+              I want to buy
+            </span>
+            <span className="font-display text-[15px] font-bold tracking-[-0.4px] md:text-xl">
+              Chat with a vendor
+            </span>
+            <span className="hidden text-[13px] text-[#5C635E] md:block">
+              On WhatsApp, replies in minutes
+            </span>
+            <ArrowUpRight className="absolute right-4 top-4 hidden md:block" />
+          </a>
+          <div className="mt-1.5 hidden flex-wrap gap-1.5 text-[11.5px] text-[#5C635E] xl:flex">
+            <span className="w-full font-medium">Built with</span>
+            {models.map((m) => (
+              <span
+                key={m}
+                className="rounded-full bg-[#EFE6D8] px-2.5 py-1.25 font-bold text-[#15201B]"
+              >
+                {m}
+              </span>
+            ))}
           </div>
         </div>
-
-        <div className="lp-phone" aria-label="Example WhatsApp conversation">
-          <div className="lp-phone-bar"><span className="lp-dot" />{shop}<em>online</em></div>
-          <div className="lp-chat">
-            <p className="lp-in">Abeg how much be the bone straight 24 inches? I dey Ibadan 🙏</p>
-            <p className="lp-out">
-              Bone Straight 24 inches na ₦98,000, e dey in stock. Delivery to Ibadan na ₦4,500. You wan make I pack am?
-              <span className="lp-checks">✓ prices from your catalogue · 8 checks passed</span>
-            </p>
-            <p className="lp-in lp-voice"><span aria-hidden>🎙</span> 0:07 · “I go take am, send the link”</p>
-            <p className="lp-out">
-              Order SA-7KQ2: ₦102,500 total. Tap to confirm: <u>sellai.app/o/SA-7KQ2</u>
-            </p>
-          </div>
+      </main>
+      <section
+        id="how"
+        aria-labelledby="how-title"
+        className="scroll-mt-[72px] md:scroll-mt-[88px] flex justify-between items-center rounded-t-[26px] bg-forest py-10 px-4 mb-6 lg:flex-row md:flex-row flex-col"
+      >
+        <div className="lg:w-[19%] md:w-[19%] w-full mb-3">
+          <h2
+            id="how-title"
+            className="m-0 font-display text-[19px] font-bold leading-[1.05] tracking-[-0.6px] text-[#F7F4EE] md:text-[26px]"
+          >
+            How it works for sellers
+          </h2>
+          <p className="m-0 text-[12.5px] leading-normal text-[#CDEBDC]">
+            Nothing reaches a buyer until it passes independent checks.
+          </p>
         </div>
-      </section>
-
-      <section id="shop" className="lp-section">
-        <div className="lp-head">
-          <h2>Shop {shop}</h2>
-          <p>Live catalogue. Tap a product to ask about it on WhatsApp. SellAI answers with the real price and delivery fee.</p>
-        </div>
-        {products.length ? (
-          <div className="lp-products">
-            {products.map((p) => {
-              const inStock = p.variants.filter((v) => v.stock > 0);
-              const from = Math.min(...(inStock.length ? inStock : p.variants).map((v) => v.priceNaira));
-              return (
-                <a key={p.id} className="lp-product" href={waLink(`Hi! How much is the ${p.name}?`)} target="_blank" rel="noopener noreferrer">
-                  <div className="lp-product-img">
-                    {p.imageUrl ? <img src={p.imageUrl} alt={p.name} loading="lazy" /> : <span>{p.name.split(" ").slice(0, 2).map((w) => w[0]).join("")}</span>}
-                  </div>
-                  <strong>{p.name}</strong>
-                  <span className="lp-price">from {naira(from)}</span>
-                  <span className={inStock.length ? "lp-stock" : "lp-stock out"}>
-                    {inStock.length ? `${inStock.map((v) => v.label).join(" · ")}` : "Sold out"}
-                  </span>
-                  <span className="lp-ask">Ask on WhatsApp →</span>
-                </a>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="lp-muted">The catalogue is loading. <a href={waLink(`Hi ${shop}!`)}>Message the shop on WhatsApp</a> in the meantime.</p>
-        )}
-      </section>
-
-      <section id="how" className="lp-section">
-        <div className="lp-head">
-          <h2>How it works for sellers</h2>
-          <p>Every step runs on Meta&apos;s models, and nothing reaches a buyer until it passes independent checks.</p>
-        </div>
-        <ol className="lp-steps">
-          <li><b>Finds the buyers</b><span>Triage sorts every comment and DM by buying intent, in the languages your customers actually write. Spam out, complaints flagged.</span></li>
-          <li><b>Replies from your real data</b><span>The agent looks up price, stock and delivery before it writes. A reply with a made-up price or a bank number is blocked.</span></li>
-          <li><b>Photo to listing</b><span>Snap a product. It is named, cut out and turned into a clean studio shot. You only set the price.</span></li>
-          <li><b>Shows which post made money</b><span>Checkout links tie every order back to the post that started it, from comment to paid.</span></li>
+        <ol className="lg:w-[80%] md:w-[80%] w-full flex justify-between lg:flex-row md:flex-row flex-col">
+          {steps.map((s, i) => (
+            <li
+              key={s.title}
+              className="rounded-[18px] bg-[#F7F4EE] px-3 py-4 mb-3 lg:w-[24%] md:w-[24%] w-full"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-bold text-[#B4471F]">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <StepIcon name={s.icon} />
+              </div>
+              <h3 className="m-0 text-[15.5px] font-bold">{s.title}</h3>
+              <p className="m-0 text-xs leading-[1.45] text-[#5C635E] md:text-[13px]">
+                {s.body}
+              </p>
+            </li>
+          ))}
         </ol>
       </section>
-
-      <section className="lp-models">
-        <span>Built with</span>
-        <b>Muse Spark 1.3</b><b>Muse Voice Transcribe</b><b>SAM 3.1</b><b>Muse Image</b>
-      </section>
-
-      <footer className="lp-foot">
-        <span>SellAI · built for the Meta Global AI Developer Hackathon 2026</span>
-        <span><Link href="/privacy">Privacy</Link> · <Link href="/inbox">Seller login</Link></span>
-      </footer>
+      <Footer />
     </div>
   );
 }
