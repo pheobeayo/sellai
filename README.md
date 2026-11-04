@@ -2,6 +2,15 @@
 
 **An AI sales desk for small businesses that sell through Instagram, Facebook and WhatsApp, starting with Nigerian vendors.**
 
+| | |
+|---|---|
+| 🎬 **Demo video (3 min)** | https://youtu.be/Qn5MVwBAUp4 |
+| 🌐 **Live app** | https://sellai-meta.vercel.app |
+| 🛍️ **Public shop** | https://sellai-meta.vercel.app/shop |
+| 🔑 **Seller pages (for judges)** | https://sellai-meta.vercel.app/login → *Have a shop passcode?* → sellai-judges-2026 |
+
+**Results:** 98.2% intent accuracy on 60 labelled comments in English, Pidgin, Yoruba, Igbo and Hausa (100% recall on ready-to-buy) · 24/24 scripted sales conversations passed with no invented prices · verified live end to end on WhatsApp: question → grounded reply → checkout link → confirmed → paid → revenue on the dashboard.
+
 In Nigeria, a huge share of retail happens in comment sections and DMs. A vendor posts a wig and gets hundreds of comments: *"HM?"*, *"abeg how much be this one"*, *"una dey deliver Ibadan?"*, *"Elo ni? Mo fe ra"*. Real buyers are buried in casual engagement, written in Pidgin, Yoruba, Igbo, Hausa or a mix. Vendors miss sales because they can't reply fast enough, and they can't tell which posts actually make money.
 
 SellAI:
@@ -11,6 +20,8 @@ SellAI:
 3. **Turns photos into listings.** A product photo becomes a named, cut-out, studio-shot catalogue entry; the vendor only sets the price.
 4. **Turns intent into orders.** When a buyer is ready, the agent creates a draft order and a short tracked checkout link that opens WhatsApp with the order reference.
 5. **Shows which post earned the money.** Every order and link click is tied to the post that produced it.
+6. **Rewards loyal customers.** Recognises repeat buyers across Facebook, Instagram and WhatsApp; Muse Spark suggests a reward within the vendor's limits, and the agent applies it on their next order.
+7. **Logs sellers in with WhatsApp.** The seller sends a one-time code from their own number; no passwords.
 
 > Built for the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026), theme: *Build for Your World*.
 > All code in this repository was written during the hackathon. See the commit history.
