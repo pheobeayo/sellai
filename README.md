@@ -7,9 +7,13 @@
 | 🎬 **Demo video (3 min)** | https://youtu.be/Qn5MVwBAUp4 |
 | 🌐 **Live app** | https://sellai-meta.vercel.app |
 | 🛍️ **Public shop** | https://sellai-meta.vercel.app/shop |
-| 🔑 **Seller pages (for judges)** | https://sellai-meta.vercel.app/login → *Have a shop passcode?* → sellai-judges-2026 |
+| 🔑 **Seller pages (for judges)** | https://sellai-meta.vercel.app/login → *Have a shop passcode?* → passcode in the submission form |
 
 **Results:** 98.2% intent accuracy on 60 labelled comments in English, Pidgin, Yoruba, Igbo and Hausa (100% recall on ready-to-buy) · 24/24 scripted sales conversations passed with no invented prices · verified live end to end on WhatsApp: question → grounded reply → checkout link → confirmed → paid → revenue on the dashboard.
+
+![SellAI landing page: a seller path to the sales desk and a buyer path to WhatsApp, with an example Pidgin question answered from the real catalogue](docs/screenshots/landing.png)
+
+![The seller inbox: buyers sorted first, with intent, channel and draft status on every message](docs/screenshots/inbox.png)
 
 In Nigeria, a huge share of retail happens in comment sections and DMs. A vendor posts a wig and gets hundreds of comments: *"HM?"*, *"abeg how much be this one"*, *"una dey deliver Ibadan?"*, *"Elo ni? Mo fe ra"*. Real buyers are buried in casual engagement, written in Pidgin, Yoruba, Igbo, Hausa or a mix. Vendors miss sales because they can't reply fast enough, and they can't tell which posts actually make money.
 
